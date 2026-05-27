@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>16 Day Hourly Temperature</title>
+	<link rel="shortcut icon" href="favicon.ico" />
+	<link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico" />
+	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+	<link rel="stylesheet" href="css/weather-icons.min.css" />
+	<link rel="stylesheet" href="css/styles.css" />
+
+	<script src="d3.v5.min.js"></script>
+	<script src="d3.v2.js"></script>
+	<script src="script/weatherGrid.js"></script>
+	<script src="script/locationSearch.js"></script>
+</head>
+
+<body class="main-layout">
+	<h1>16 Day Hourly Temperature</h1>
+
+	<div class="location-search" id="location-search">
+		<label class="location-search-label" for="location-input">Location</label>
+		<div class="location-search-row">
+			<input type="search" id="location-input" name="location" placeholder="City, zip code, or address"
+				autocomplete="off" spellcheck="false" />
+			<button type="button" id="location-use-geolocation" class="location-geo-btn"
+				title="Use my current location" aria-label="Use my current location">
+				<span aria-hidden="true">&#9678;</span>
+			</button>
+		</div>
+		<ul id="location-suggestions" class="location-suggestions" hidden></ul>
+	</div>
+
+	<p id="location-display" class="location-display"></p>
+	<p id="weather-status" class="weather-status" aria-live="polite"></p>
+
+	<div id="graph" class="aGraph"></div>
+
+	<h2>What is this?</h2>
+	<p>
+		This is a way to more intuitively view and understand the temperatures in your area in the upcoming days. Each
+		square represents the temperature of each hour for the next 16 days, starting at midnight today. The color of
+		each block depends on which temperature range it falls into, in 10 degree increments. You can hover over a square
+		to get the specific temperature for that hour. This can help you to understand, at a glance, how the temperature
+		will behave throughout the upcoming days, allowing you to plan your outfit accordingly. If you see blocks of cooler
+		temperatures, that means in those hours it will be cooler, and you might want to plan to wear warmer clothes during
+		that time period. Likewise, if you see blocks of warmer colors, it means those hours will be comparatively warmer
+		compared to the rest of the day, and you might want to make sure you wear clothes that will allow you to be
+		comfortable when the temperature rises. This can be especially useful when planning a vacation, as you can get a
+		sense for how the weather will be at your destination during the duration of your stay, allowing you to pack
+		appropriate clothing. The legend at the bottom shows which colors correspond to which ranges of temperatures.
+		This page was created by Raymond Garrison.
+	</p>
+	<p>Weather data from <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
+</body>
+
+</html>

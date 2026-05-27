@@ -1,0 +1,227 @@
+.wi {
+	color: black;
+}
+
+foreignObject.grid-icon {
+	overflow: visible;
+}
+
+.grid-icon-cell {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+	line-height: 1;
+}
+
+.grid-icon-cell .wi {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1em;
+	height: 1em;
+	font-size: x-large;
+	line-height: 1;
+	color: black;
+}
+
+.grid-icon-cell .wi:before {
+	line-height: 1;
+}
+
+.grid-glyph-box {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+/* .grid-glyph-box .wi-day-cloudy {
+	transform: scale(0.8);
+	transform-origin: center center;
+} */
+
+.grid-icon-cell .grid-weather-svg {
+	display: block;
+	width: 70%;
+	height: 70%;
+	stroke: #000000;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	fill: none;
+	vector-effect: non-scaling-stroke;
+}
+
+.main-layout {
+	background-color: #333333;
+}
+
+h1 {
+	color: LightSteelBlue;
+	font-family: arial;
+	text-align: center;
+}
+
+h2 {
+	color: LightSteelBlue;
+	font-family: arial;
+	text-align: center;
+}
+
+p {
+	color: LightSteelBlue;
+	font-family: arial;
+	margin: 0px 20%;
+	padding: 0px;
+	text-align: left;
+}
+
+div.tooltip {
+	position: absolute;
+	text-align: center;
+	padding: 0.5em 1em;
+	font: 12px sans-serif;
+	background: lightsteelblue;
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+.aGraph {
+	overflow: visible;
+}
+
+.weather-grid-svg {
+	display: block;
+	margin: 0 auto;
+	overflow: visible;
+}
+
+.location-search {
+	position: relative;
+	max-width: 32rem;
+	margin: 0 auto 0.5em;
+	padding: 0 1rem;
+}
+
+.location-search-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.location-search-row {
+	display: flex;
+	gap: 0.5rem;
+}
+
+#location-input {
+	flex: 1;
+	min-width: 0;
+	padding: 0.6em 0.75em;
+	font-size: 1rem;
+	font-family: arial, sans-serif;
+	border: 1px solid #555;
+	border-radius: 6px;
+	background: #222;
+	color: lightsteelblue;
+}
+
+#location-input::placeholder {
+	color: #8899aa;
+}
+
+#location-input:focus {
+	outline: 2px solid lightsteelblue;
+	outline-offset: 1px;
+}
+
+.location-geo-btn {
+	flex-shrink: 0;
+	width: 2.75rem;
+	padding: 0;
+	font-size: 1.25rem;
+	line-height: 1;
+	border: 1px solid #555;
+	border-radius: 6px;
+	background: #222;
+	color: lightsteelblue;
+	cursor: pointer;
+}
+
+.location-geo-btn:hover,
+.location-geo-btn:focus {
+	background: #333;
+	outline: 2px solid lightsteelblue;
+	outline-offset: 1px;
+}
+
+.location-suggestions {
+	position: absolute;
+	left: 1rem;
+	right: 1rem;
+	z-index: 100;
+	margin: 0.25rem 0 0;
+	padding: 0;
+	list-style: none;
+	background: #222;
+	border: 1px solid #555;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+	max-height: 16rem;
+	overflow-y: auto;
+}
+
+.location-suggestions li {
+	margin: 0;
+	padding: 0;
+}
+
+.location-suggestions button {
+	display: block;
+	width: 100%;
+	padding: 0.6em 0.75em;
+	border: none;
+	background: transparent;
+	color: lightsteelblue;
+	font-family: arial, sans-serif;
+	font-size: 0.95rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.location-suggestions button:hover,
+.location-suggestions button:focus {
+	background: #333;
+	outline: none;
+}
+
+.location-display {
+	text-align: center;
+	color: lightsteelblue;
+	font-family: arial, sans-serif;
+	margin: 0.25em 0;
+	min-height: 1.25em;
+}
+
+.weather-status {
+	text-align: center;
+	color: #8899aa;
+	font-family: arial, sans-serif;
+	font-size: 0.9rem;
+	margin: 0 0 0.5em;
+	min-height: 1.1em;
+}
