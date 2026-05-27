@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>7 Day Hourly Temperature</title>
+	<link rel="shortcut icon" href="favicon.ico" />
+
+	<link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico" />
+	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+	<link rel="stylesheet" href="css/weather-icons.min.css" />
+	<link rel="stylesheet" href="css/styles.css" />
+
+<body bgcolor="#000000">
+	<style type="text/css">
+		h1 {
+			color: LightSteelBlue;
+			font-family: arial;
+			text-align: center;
+		}
+
+		h2 {
+			color: LightSteelBlue;
+			font-family: arial;
+			text-align: center;
+		}
+
+		p {
+			color: LightSteelBlue;
+			font-family: arial;
+			margin: 0px 20%;
+			padding: 0px;
+			text-align: left;
+		}
+
+		div.tooltip {
+			position: absolute;
+			text-align: center;
+			padding: 0.5em 1em;
+			font: 12px sans-serif;
+			background: lightsteelblue;
+			border: 0px;
+			border-radius: 8px;
+			pointer-events: none;
+		}
+	</style>
+
+	<script src="d3.v5.min.js"></script>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+	<script src="d3.v2.js"></script>
+
+	<h1> 7 Day Hourly Temperature</h1>
+	</head>
+	<div id="body" style="margin auto 0">
+
+		<body>
+
+
+			<center>
+				<div id="graph" class="aGraph"></div>
+				<div id=form_div>
+					<form name="form">
+						<select name="state" id="state">
+							<option value="0" selected="selected">Select a state</option>
+							<option value="AL" <?PHP if($state=="AL" ) echo "selected" ;?>Alabama</option>
+							<option value="AK" <?PHP if($state=="AK" ) echo "selected" ;?>Alaska</option>
+							<option value="AZ" <?PHP if($state=="AZ" ) echo "selected" ;?>Arizona</option>
+							<option value="AR" <?PHP if($state=="AR" ) echo "selected" ;?>Arkansas</option>
+							<option value="CA" <?PHP if($state=="CA" ) echo "selected" ;?>California</option>
+							<option value="CO" <?PHP if($state=="CO" ) echo "selected" ;?>Colorado</option>
+							<option value="CT" <?PHP if($state=="CT" ) echo "selected" ;?>Connecticut</option>
+							<option value="DE" <?PHP if($state=="DE" ) echo "selected" ;?>Delaware</option>
+							<option value="DC" <?PHP if($state=="DC" ) echo "selected" ;?>District of Columbia</option>
+							<option value="FL" <?PHP if($state=="FL" ) echo "selected" ;?>Florida</option>
+							<option value="GA" <?PHP if($state=="GA" ) echo "selected" ;?>Georgia</option>
+							<option value="HI" <?PHP if($state=="HI" ) echo "selected" ;?>Hawaii</option>
+							<option value="ID" <?PHP if($state=="ID" ) echo "selected" ;?>Idaho</option>
+							<option value="IL" <?PHP if($state=="IL" ) echo "selected" ;?>Illinois</option>
+							<option value="IN" <?PHP if($state=="IN" ) echo "selected" ;?>Indiana</option>
+							<option value="IA" <?PHP if($state=="IA" ) echo "selected" ;?>Iowa</option>
+							<option value="KS" <?PHP if($state=="KS" ) echo "selected" ;?>Kansas</option>
+							<option value="KY" <?PHP if($state=="KY" ) echo "selected" ;?>Kentucky</option>
+							<option value="LA" <?PHP if($state=="LA" ) echo "selected" ;?>Louisiana</option>
+							<option value="ME" <?PHP if($state=="ME" ) echo "selected" ;?>Maine</option>
+							<option value="MD" <?PHP if($state=="MD" ) echo "selected" ;?>Maryland</option>
+							<option value="MA" <?PHP if($state=="MA" ) echo "selected" ;?>Massachusetts</option>
+							<option value="MI" <?PHP if($state=="MI" ) echo "selected" ;?>Michigan</option>
+							<option value="MN" <?PHP if($state=="MN" ) echo "selected" ;?>Minnesota</option>
+							<option value="MS" <?PHP if($state=="MS" ) echo "selected" ;?>Mississippi</option>
+							<option value="MO" <?PHP if($state=="MO" ) echo "selected" ;?>Missouri</option>
+							<option value="MT" <?PHP if($state=="MT" ) echo "selected" ;?>Montana</option>
+							<option value="NE" <?PHP if($state=="NE" ) echo "selected" ;?>Nebraska</option>
+							<option value="NV" <?PHP if($state=="NV" ) echo "selected" ;?>Nevada</option>
+							<option value="NH" <?PHP if($state=="NH" ) echo "selected" ;?>New Hampshire</option>
+							<option value="NJ" <?PHP if($state=="NJ" ) echo "selected" ;?>New Jersey</option>
+							<option value="NM" <?PHP if($state=="NM" ) echo "selected" ;?>New Mexico</option>
+							<option value="NY" <?PHP if($state=="NY" ) echo "selected" ;?>New York</option>
+							<option value="NC" <?PHP if($state=="NC" ) echo "selected" ;?>North Carolina</option>
+							<option value="ND" <?PHP if($state=="ND" ) echo "selected" ;?>North Dakota</option>
+							<option value="OH" <?PHP if($state=="OH" ) echo "selected" ;?>Ohio</option>
+							<option value="OK" <?PHP if($state=="OK" ) echo "selected" ;?>Oklahoma</option>
+							<option value="OR" <?PHP if($state=="OR" ) echo "selected" ;?>Oregon</option>
+							<option value="PA" <?PHP if($state=="PA" ) echo "selected" ;?>Pennsylvania</option>
+							<option value="RI" <?PHP if($state=="RI" ) echo "selected" ;?>Rhode Island</option>
+							<option value="SC" <?PHP if($state=="SC" ) echo "selected" ;?>South Carolina</option>
+							<option value="SD" <?PHP if($state=="SD" ) echo "selected" ;?>South Dakota</option>
+							<option value="TN" <?PHP if($state=="TN" ) echo "selected" ;?>Tennessee</option>
+							<option value="TX" <?PHP if($state=="TX" ) echo "selected" ;?>Texas</option>
+							<option value="UT" <?PHP if($state=="UT" ) echo "selected" ;?>Utah</option>
+							<option value="VT" <?PHP if($state=="VT" ) echo "selected" ;?>Vermont</option>
+							<option value="VA" <?PHP if($state=="VA" ) echo "selected" ;?>Virginia</option>
+							<option value="WA" <?PHP if($state=="WA" ) echo "selected" ;?>Washington</option>
+							<option value="WV" <?PHP if($state=="WV" ) echo "selected" ;?>West Virginia</option>
+							<option value="WI" <?PHP if($state=="WI" ) echo "selected" ;?>Wisconsin</option>
+							<option value="WY" <?PHP if($state=="WY" ) echo "selected" ;?>Wyoming</option>
+						</select>
+						<input name="city" type="text" placeholder="Enter your city or zip">
+						<input name="button" type="submit" value="Search">
+					</form>
+				</div>
+			</center>
+
+
+			<script>
+				// TODO: Figure out how to seperate the days, and black out the hours of the current day that have already passed.
+				// TODO: label dates
+				jQuery(document).ready(function ($) {
+
+					function getUrlVars() {
+						var vars = [], hash;
+						var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+						for (var i = 0; i < hashes.length; i++) {
+							hash = hashes[i].split('=');
+							vars.push(hash[0]);
+							vars[hash[0]] = hash[1];
+						}
+						return vars;
+					};
+					var state = getUrlVars()["state"];
+					var city = getUrlVars()["city"];
+
+					function formatAMPM(date) {
+						var hours = date.getHours();
+						var ampm = hours >= 12 ? 'PM' : 'AM';
+						hours = hours % 12;
+						hours = hours ? hours : 12; // the hour '0' should be '12'
+						var strTime = hours + ampm;
+						return strTime;
+					}
+
+					if (state == null) { state = "GA"; city = "Atlanta"; }
+					var u = "https://api.darksky.net/forecast/0aeb8164251a55e4e54d362b7ca7cd4b/30.5549,-81.4444?extend=hourly";
+                    // Potential new APIs once darksky no longer works 
+                    // https://open-meteo.com/en/docs?
+                    // https://openweathermap.org/api
+                    // https://www.visualcrossing.com/weather-api
+					$.ajax({
+
+						url: u,
+						dataType: "jsonp",
+						success: function (weatherData) {
+
+							var color = d3.scale.category20c();
+							//var location = weatherData['current_observation']['display_location']['city'];
+							//var temp_f = weatherData['current_observation']['temp_f'];
+							//var hour = weatherData['hourly_forecast'][0]['FCTTIME']['hour'];
+							//var temp = weatherData['hourly_forecast'][0]['temp']['english'];
+							const weekDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+							const monthNames = ["January", "February", "March", "April", "May", "June", "July",
+								"August", "September", "October", "November", "December"];
+							const hours = weatherData.hourly.data;
+							hours.shift();
+							// console.log('hours: ', hours);
+							const temps = hours.map(h => h.temperature);
+							// console.log('temps: ', temps);
+							const icons = hours.map(h => h.icon);
+							// console.log('icons: ', icons);
+
+							const iconMap = {
+								'clear-day': 'wi-wu-clear',
+								'clear-night': 'wi-night-clear',
+								'partly-cloudy-day': 'wi-day-cloudy',
+								'partly-cloudy-night': 'wi-night-alt-cloudy',
+								'snow': 'wi-snow',
+								'sleet': 'wi-sleet',
+								'wind': 'wi-strong-wind',
+								'cloudy': 'wi-cloudy',
+								'fog': 'wi-fog',
+								'rain': 'wi-rain',
+								'default': 'wi-alien'
+							};
+
+							var div = d3.select("body").append("div")
+								.attr("class", "tooltip")
+								.style("opacity", 0);
+
+							//var today = weatherData['hourly_forecast'][0]['FCTTIME']['mday'];
+							//var temps = new Array();
+							//var icons = new Array();
+							var legendTemps = new Array();
+							var scale = 0.75;
+							var j;
+
+
+							var w = window,
+								d = document,
+								e = d.documentElement,
+								g = d.getElementsByTagName('body')[0],
+								x = w.innerWidth || e.clientWidth || g.clientWidth,
+								y = w.innerHeight || e.clientHeight || g.clientHeight;
+
+							var blockSizeDivider = 40;
+
+							var blockSize = x / blockSizeDivider;
+
+							var m4 = [10, 10, 10, 10]; //margins for temperature //were all 10
+							var width4 = x - m4[1] - m4[3]; // width //was 800
+							var height4 = y * (scale) - m4[0] - m4[2]; //height was 450
+
+							// var rectx = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24];
+							// var recty = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+							var dayIndex = 0;
+							var i = 0;
+							// while (i < 240) {
+							// 	hours[i] = parseInt(weatherData['hourly_forecast'][i + dayIndex]['FCTTIME']['hour']);
+							// 	temps[i] = parseInt(weatherData['hourly_forecast'][i + dayIndex]['temp']['english']);
+							// 	icons[i] = weatherData['hourly_forecast'][i + dayIndex]['icon_url'];
+							// 	i++;
+							// }
+
+							j = -10;
+							i = 0;
+							while (j < 110) {
+								legendTemps[i] = j;
+								i++;
+								j++;
+							}
+
+							//console.log("legend temps: " + legendTemps);
+							//console.log("icons: " + icons);
+
+							//Testing purposes only! -------------------------
+							//j = -50;
+							//i = 0;
+							//while (j<240){
+							//temps[i] = j;
+							//i++;
+							//j++;
+							//}
+							//console.log(temps);
+							//Testing purposes only! -------------------------
+
+							var graph3 = d3.select("#graph").append("svg:svg") // temperature graph
+								.attr("id", "graph3")
+								.attr("width", width4 + m4[1] + m4[3])
+								.attr("height", height4 + m4[0] + m4[2])
+								// .attr("height", 370)
+								.append("svg:g")
+								.attr("transform", "translate(" + m4[3] + "," + m4[0] + ")");
+
+							/*var legend1 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(0,0,100));
+							var legend2 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+85).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(0,0,255));
+							var legend3 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+170).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(0,174,255));
+							var legend4 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+255).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(185,248,255));
+							var legend5 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(255,217,140));
+							var legend6 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+85).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(255,140,54));
+							var legend7 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+170).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(217,102,64));
+							var legend8 = graph3.append("svg:rect")
+							.attr("x",blockSize+x/2-(blockSize*14)+255).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2).attr("fill",d3.rgb(204,51,0));
+
+							var label1 = graph3.append("text").text("<30 F").attr("x", blockSize+x/2-(blockSize*14)+25).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label2 = graph3.append("text").text("30-40 F").attr("x", blockSize+x/2-(blockSize*14)+110).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label3 = graph3.append("text").text("40-50 F").attr("x", blockSize+x/2-(blockSize*14)+195).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label4 = graph3.append("text").text("50-60 F").attr("x", blockSize+x/2-(blockSize*14)+280).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label5 = graph3.append("text").text("60-70 F").attr("x", blockSize+x/2-(blockSize*14)+25).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label6 = graph3.append("text").text("70-80 F").attr("x", blockSize+x/2-(blockSize*14)+110).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label7 = graph3.append("text").text("80-90 F").attr("x", blockSize+x/2-(blockSize*14)+195).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+							var label8 = graph3.append("text").text("90-100 F").attr("x", blockSize+x/2-(blockSize*14)+280).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");*/
+
+							// TODO: Add location here when you figure out how to get it from the google maps api from long/lat
+							var title = graph3.append("text").text(" Hourly Temperature ").attr("x", x / 2.1).attr("y", 10).style("text-anchor", "middle").attr("fill", "LightSteelBlue").attr("font-family", "sans-serif").attr("font-size", "25px");
+
+
+							function updateWindow() {
+								x = w.innerWidth || e.clientWidth || g.clientWidth;
+								y = w.innerHeight || e.clientHeight || g.clientHeight;
+								blockSize = x / blockSizeDivider;
+
+								rect.attr("x", (d, i) => (i % 24 + 1) * blockSize + x / 2 - (blockSize * 14)).
+									attr("y", (d, i) => (Math.floor(i / 24) + 1) * blockSize).
+									attr("width", blockSize - 2).
+									attr("height", blockSize - 2);
+
+								height4 = y * (scale) - m4[0] - m4[2];
+								width4 = x - m4[1] - m4[3];
+
+
+								graph3.selectAll("text").remove();
+								// TODO: Add location here when you figure out how to get it from the google maps api from long/lat
+								graph3.append("text").text("Hourly Temperature ").attr("x", x / 2.1).attr("y", 10).style("text-anchor", "middle").attr("fill", "LightSteelBlue").attr("font-family", "sans-serif").attr("font-size", "25px");
+
+								//legend1.attr("x",blockSize+x/2-(blockSize*14)).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend2.attr("x",blockSize+x/2-(blockSize*14)+85).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend3.attr("x",blockSize+x/2-(blockSize*14)+170).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend4.attr("x",blockSize+x/2-(blockSize*14)+255).attr("y",11.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend5.attr("x",blockSize+x/2-(blockSize*14)).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend6.attr("x",blockSize+x/2-(blockSize*14)+85).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend7.attr("x",blockSize+x/2-(blockSize*14)+170).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+								//legend8.attr("x",blockSize+x/2-(blockSize*14)+255).attr("y",12.5*blockSize).attr("width",blockSize/2).attr("height",blockSize/2);
+
+								//label1 = graph3.append("text").text("<30 F").attr("x", blockSize+x/2-(blockSize*14)+25).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label2 = graph3.append("text").text("30-40 F").attr("x", blockSize+x/2-(blockSize*14)+110).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label3 = graph3.append("text").text("40-50 F").attr("x", blockSize+x/2-(blockSize*14)+195).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label4 = graph3.append("text").text("50-60 F").attr("x", blockSize+x/2-(blockSize*14)+280).attr("y",12*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label5 = graph3.append("text").text("60-70 F").attr("x", blockSize+x/2-(blockSize*14)+25).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label6 = graph3.append("text").text("70-80 F").attr("x", blockSize+x/2-(blockSize*14)+110).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label7 = graph3.append("text").text("80-90 F").attr("x", blockSize+x/2-(blockSize*14)+195).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+								//label8 = graph3.append("text").text("90-100 F").attr("x", blockSize+x/2-(blockSize*14)+280).attr("y",13*blockSize).attr("fill", "LightSteelBlue").attr("font-family","sans-serif");
+
+							}
+							window.onresize = updateWindow;
+
+							var rect = graph3.selectAll("rect")
+								.data(temps, String);
+
+							var colorc = d3.scale.linear() // -50 - -10
+								.domain([-50, -10])
+								.range([d3.rgb(0, 0, 0), d3.rgb(128, 0, 128)]);
+							var color0 = d3.scale.linear() // -10-30
+								.domain([-10, 30])
+								.range([d3.rgb(128, 0, 128), d3.rgb(0, 0, 255)]);
+
+							var color1 = d3.scale.linear() // 30-60 degrees, colder temps, might not be a good color selection...
+								.domain([30, 60])
+								.range([d3.rgb(0, 0, 255), d3.rgb(185, 248, 255)]);
+							var color2 = d3.scale.linear() //60-80 degrees, temperate
+								.domain([60, 80])
+								.range([d3.rgb(185, 248, 255), d3.rgb(255, 140, 54)]);
+
+							var color3 = d3.scale.linear()  // 80-100 degrees (orange to red)
+								.domain([80, 100])
+								.range([d3.rgb(255, 140, 54), d3.rgb(255, 0, 0)]);
+
+							var color4 = d3.scale.linear()  // 100-130 degrees (orange to red)
+								.domain([100, 130])
+								.range([d3.rgb(255, 0, 0), d3.rgb(0, 0, 0)]);
+
+							rect.enter().append("svg:rect").
+								attr("x", (d, i) => (i % 24 + 1) * blockSize + x / 2 - (blockSize * 14)).
+								attr("y", (d, i) => (Math.floor(i / 24) + 1) * blockSize).
+								attr("width", blockSize - 2).
+								attr("height", blockSize - 2).
+								attr("fill", function (d, i) {
+									if (temps[i] < 130 && temps[i] >= 100) { // 70-100 degrees
+										return color4(temps[i]);
+									}
+									else if (temps[i] < 100 && temps[i] >= 80) { // 80-100 degrees
+										return color3(temps[i]);
+									}
+									else if (temps[i] < 80 && temps[i] >= 60) { //60-80 degrees
+										return color2(temps[i]);
+									}
+									else if (temps[i] < 60 && temps[i] >= 30) { //30-60 degrees
+										return color1(temps[i]);
+									}
+									else if (temps[i] < 30 && temps[i] >= -10) { //-10-32 degrees
+										return color0(temps[i]);
+									}
+									else if (temps[i] < -10 && temps[i] >= -50) { //-50 - -10 degrees
+										return colorc(temps[i]);
+									}
+									else if (temps[i] >= 130 || temps[i] < -50) {  //greater than 130 degrees or less than -50 degrees
+										return d3.rgb(0, 0, 0);
+									}
+									else { return d3.rgb(0, 0, 0); }
+								});
+
+							rect.enter().append('svg:foreignObject').
+								attr("x", (d, i) => (i % 24 + 1) * blockSize + x / 2 - (blockSize * 14) - 2).
+								attr("y", (d, i) => (Math.floor(i / 24) + 1) * blockSize - 2).
+								attr("width", blockSize).
+								attr("height", blockSize).
+								append("xhtml:body").
+								html(`<i class="wi"></i>`).
+								attr("class", function (d, i) { return 'wi ' + iconMap[icons[i]]; }).
+								on("mouseover", function (d, i) {
+									const index = i;
+									div.transition()
+										.duration(200)
+										.style("opacity", .9);
+									div.html(
+										function (d, i) {
+											const time = hours[index].time;
+											const date = new Date(time * 1000);
+											const weekDayName = weekDays[date.getDay()];
+											const monthName = monthNames[date.getMonth()];
+											return weekDayName + ", " + monthName + " " + date.getDate() + ", " + formatAMPM(date) + "<br /> "
+												+ Math.round(temps[index]) + " degrees F." + "<br />"
+												+ hours[index].summary;
+										}
+									)
+										.style("left", (d3.event.pageX) + "px")
+										.style("top", (d3.event.pageY - 28) + "px");
+								}).
+								on("mouseout", function (d) {
+									div.transition()
+										.duration(500)
+										.style("opacity", 0);
+								});
+
+							updateWindow;
+
+							var legendTemp;
+							for (var i = 0; i < 120; i++) {
+								legendTemp = legendTemps[i];
+								//console.log("legendTemp: " + legendTemp)
+								graph3.append("svg:rect")
+									.attr("x", blockSize + x / 2 - (blockSize * 14) + (i * 8)).attr("y", 8.5 * blockSize).attr("width", blockSize / 6).attr("height", blockSize / 2).attr("fill", function (d, legendTemp) {  // I don't understand this code. I can't pass in legendTemps[i] and I can't use legendTemp in the actual function. It doesn't make sense.
+										//console.log("legendTemp: " + legendTemp)
+										if (legendTemps[i] < 130 && legendTemps[i] >= 100) { // 70-100 degrees
+											//console.log("color4")
+											return color4(legendTemps[i]);
+										}
+										else if (legendTemps[i] < 100 && legendTemps[i] >= 80) { // 80-100 degrees
+											//console.log("color3")
+											return color3(legendTemps[i]);
+										}
+										else if (legendTemps[i] < 80 && legendTemps[i] >= 60) { //60-80 degrees
+											//console.log("color2")
+											return color2(legendTemps[i]);
+										}
+										else if (legendTemps[i] < 60 && legendTemps[i] >= 30) { //30-60 degrees
+											//console.log("color1")
+											return color1(legendTemps[i]);
+										}
+										else if (legendTemps[i] < 30 && legendTemps[i] >= -10) { //-10-32 degrees
+											//console.log("color0")
+											return color0(legendTemps[i]);
+										}
+										else if (legendTemps[i] < -10 && legendTemps[i] >= -50) { //-50 - -10 degrees
+											//console.log("color0")
+											return colorc(legendTemps[i]);
+										}
+										else if (legendTemps[i] >= 130 || legendTemps[i] < -50) {  //greater than 130 degrees or less than -50 degrees
+											//console.log("undefined")
+											return d3.rgb(0, 0, 0);
+										}
+										else { return d3.rgb(0, 0, 0); }
+									});//.append("svg:title").text(function(d,i) { return legendTemp});
+								//console.log("legendTemps[i]: " + legendTemps[i])
+							}
+							//Going to have to figure out resizing code for these. Gonna suck.
+							const legendLabelYVal = 9.6;
+							var label1 = graph3.append("text").text("-10 F").attr("x", blockSize + x / 2 - (blockSize * 14) - 15).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label2 = graph3.append("text").text("0 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 75).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label3 = graph3.append("text").text("10 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 150).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label4 = graph3.append("text").text("20 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 230).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label5 = graph3.append("text").text("30 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 310).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label6 = graph3.append("text").text("40 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 390).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label7 = graph3.append("text").text("50 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 470).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label8 = graph3.append("text").text("60 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 550).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label9 = graph3.append("text").text("70 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 630).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label10 = graph3.append("text").text("80 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 710).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label11 = graph3.append("text").text("90 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 790).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label12 = graph3.append("text").text("100 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 870).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+							var label13 = graph3.append("text").text("110 F").attr("x", blockSize + x / 2 - (blockSize * 14) + 940).attr("y", legendLabelYVal * blockSize).attr("fill", "LightSteelBlue").attr("font-family", "sans-serif");
+
+						}
+					});
+				});
+			</script>
+			<dod></dod>
+
+			<h2> What is this? </h2>
+			<P>
+				This is a way to more intuitively view and understand the temperatures in your area in the upcoming days. Each
+				square represents the temperature of each hour for the next week, starting with the upcoming hour. The color of
+				each block depends on which temperature range it falls into, in 10 degree increments. You can hover over a square
+				to get the specific temperature for that hour. This can help you to understand, at a glance, how the temperature
+				will behave throughout the upcoming days, allowing you to plan your outfit accordingly. If you see blocks of cooler
+				temperatures, that means in those hours it will be cooler, and you might want to plan to wear warmer clothes during
+				that time period. Likewise, if you see blocks of warmer colors, it means those hours will be comparatively warmer
+				compared to the rest of the day, and you might want to make sure you wear clothes that will allow you to be
+				comfortable when the temperature rises. This can be especially useful when planning a vacation, as you can get a
+				sense for how the weather will be at your destination during the duration of your stay, allowing you to pack
+				appropriate clothing. The legend at the bottom shows which colors correspond to which ranges of temperatures. The
+				temperature information is acquired from the (<a href="http://www.wunderground.com/weather/api/">Weather
+					Underground API</a>). This page was created by Raymond Garrison.
+			</P>
+		</body>
+	</div>
+
+</html>
