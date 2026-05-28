@@ -217,6 +217,13 @@ div.tooltip {
 	margin-top: 0.35rem;
 }
 
+#grid-options-temperature-only,
+#grid-options-precipitation-only {
+	margin-top: 0.75rem;
+	padding-top: 0.6rem;
+	border-top: 1px solid #444;
+}
+
 .grid-icon-cell--compact {
 	position: relative;
 	display: block;
@@ -249,7 +256,7 @@ div.tooltip {
 	height: 100%;
 }
 
-text.grid-cell-temp {
+text.grid-cell-value {
 	pointer-events: none;
 }
 

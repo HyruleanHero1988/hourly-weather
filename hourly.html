@@ -42,12 +42,34 @@
 				<span aria-hidden="true">&#9881;</span>
 			</button>
 			<div id="grid-options-panel" class="grid-options-panel" hidden>
-				<label class="grid-options-item">
-					<input type="checkbox" id="grid-options-show-temps" />
-					Show temperature in cells
-				</label>
 				<fieldset class="grid-options-fieldset">
-					<legend class="grid-options-fieldset-legend">Temperature unit</legend>
+					<legend class="grid-options-fieldset-legend">Grid display</legend>
+					<label class="grid-options-item">
+						<input type="radio" name="grid-options-grid-mode" value="temperature" checked />
+						Temperature
+					</label>
+					<label class="grid-options-item">
+						<input type="radio" name="grid-options-grid-mode" value="precipitation" />
+						Precipitation chance
+					</label>
+					<label class="grid-options-item">
+						<input type="radio" name="grid-options-grid-mode" value="cloudcover" />
+						Cloud cover
+					</label>
+				</fieldset>
+				<div id="grid-options-precipitation-only" hidden>
+					<label class="grid-options-item">
+						<input type="checkbox" id="grid-options-show-precip-icons" />
+						Show precipitation type icons
+					</label>
+				</div>
+				<div id="grid-options-temperature-only">
+					<label class="grid-options-item">
+						<input type="checkbox" id="grid-options-show-temps" />
+						Show temperature in cells
+					</label>
+					<fieldset class="grid-options-fieldset">
+						<legend class="grid-options-fieldset-legend">Temperature unit</legend>
 					<label class="grid-options-item">
 						<input type="radio" name="grid-options-temp-unit" value="fahrenheit" checked />
 						°F Fahrenheit
@@ -56,7 +78,8 @@
 						<input type="radio" name="grid-options-temp-unit" value="celsius" />
 						°C Celsius
 					</label>
-				</fieldset>
+					</fieldset>
+				</div>
 			</div>
 		</div>
 	</div>

@@ -39,6 +39,38 @@ const iconMap = {
 	'default': 'wi-alien'
 };
 
+// WMO weather interpretation codes (Open-Meteo weathercode).
+const weatherCodeDescriptions = {
+	0: 'Clear',
+	1: 'Mainly clear',
+	2: 'Partly cloudy',
+	3: 'Overcast',
+	45: 'Fog',
+	48: 'Rime fog',
+	51: 'Light drizzle',
+	53: 'Drizzle',
+	55: 'Heavy drizzle',
+	56: 'Freezing drizzle',
+	57: 'Heavy freezing drizzle',
+	61: 'Light rain',
+	63: 'Rain',
+	65: 'Heavy rain',
+	66: 'Freezing rain',
+	67: 'Heavy freezing rain',
+	71: 'Light snow',
+	73: 'Snow',
+	75: 'Heavy snow',
+	77: 'Snow grains',
+	80: 'Light rain showers',
+	81: 'Rain showers',
+	82: 'Heavy rain showers',
+	85: 'Light snow showers',
+	86: 'Heavy snow showers',
+	95: 'Thunderstorm',
+	96: 'Thunderstorm with hail',
+	99: 'Thunderstorm with heavy hail'
+};
+
 const DEFAULT_LATITUDE = 34.0754;
 const DEFAULT_LONGITUDE = -84.2941;
 const FORECAST_DAYS = 16;
@@ -52,7 +84,16 @@ const LEGEND_TICK_LABELS = [-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110
 const GRID_CONTAINER = '#graph';
 const DEFAULT_ICON_MODE = 'glyph';
 const OPTIONS_STORAGE_KEY = 'hourlyWeather.showTemperatureInCells';
+const PRECIP_ICONS_STORAGE_KEY = 'hourlyWeather.showWeatherIconsInPrecip';
 const TEMP_UNIT_STORAGE_KEY = 'hourlyWeather.temperatureUnit';
+const GRID_MODE_STORAGE_KEY = 'hourlyWeather.gridMode';
+const GRID_MODE_TEMPERATURE = 'temperature';
+const GRID_MODE_PRECIPITATION = 'precipitation';
+const GRID_MODE_CLOUD_COVER = 'cloudcover';
+const PERCENT_LEGEND_MIN = 0;
+const PERCENT_LEGEND_MAX = 100;
+const PERCENT_LEGEND_SWATCH_COUNT = 100;
+const PERCENT_LEGEND_TICK_LABELS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 var gridRuntime = {
 	tooltip: null,
@@ -67,6 +108,8 @@ var gridRuntime = {
 	useMockData: false,
 	showCellIndices: false,
 	showTemperatureInCells: false,
+	showWeatherIconsInPrecip: false,
+	gridMode: GRID_MODE_TEMPERATURE,
 	temperatureUnit: 'fahrenheit',
 	lastForecastData: null,
 	lastForecastDataUnit: 'fahrenheit',
@@ -85,8 +128,166 @@ function buildOpenMeteoUrl(latitude, longitude) {
 	var unit = gridRuntime.temperatureUnit === 'celsius' ? 'celsius' : 'fahrenheit';
 	return 'https://api.open-meteo.com/v1/forecast?latitude=' + lat
 		+ '&longitude=' + lon
-		+ '&hourly=temperature_2m,weathercode&temperature_unit=' + unit + '&forecast_days='
-		+ FORECAST_DAYS + '&timezone=auto';
+		+ '&hourly=temperature_2m,weathercode,precipitation_probability,cloudcover&temperature_unit=' + unit
+		+ '&forecast_days=' + FORECAST_DAYS + '&timezone=auto';
+}
+
+function normalizeGridMode(mode) {
+	if (mode === GRID_MODE_PRECIPITATION || mode === GRID_MODE_CLOUD_COVER) {
+		return mode;
+	}
+	return GRID_MODE_TEMPERATURE;
+}
+
+function isTemperatureGridMode() {
+	return gridRuntime.gridMode === GRID_MODE_TEMPERATURE;
+}
+
+function isPrecipitationGridMode() {
+	return gridRuntime.gridMode === GRID_MODE_PRECIPITATION;
+}
+
+function isCloudCoverGridMode() {
+	return gridRuntime.gridMode === GRID_MODE_CLOUD_COVER;
+}
+
+function isPercentOverlayGridMode() {
+	return isPrecipitationGridMode() || isCloudCoverGridMode();
+}
+
+function shouldShowCellValues() {
+	return isPercentOverlayGridMode() || gridRuntime.showTemperatureInCells;
+}
+
+function shouldShowWeatherIcons() {
+	if (isTemperatureGridMode()) {
+		return true;
+	}
+	return isPrecipitationGridMode() && gridRuntime.showWeatherIconsInPrecip;
+}
+
+function usesCompactIconCellLayout() {
+	return shouldShowWeatherIcons() && shouldShowCellValues();
+}
+
+function estimatePrecipProbabilityFromWeatherCode(weatherCode) {
+	if (weatherCode === 95 || weatherCode === 96 || weatherCode === 99) {
+		return 85;
+	}
+	if (weatherCode === 65 || weatherCode === 82 || weatherCode === 86) {
+		return 75;
+	}
+	if (weatherCode === 61 || weatherCode === 63 || weatherCode === 80 || weatherCode === 81) {
+		return 60;
+	}
+	if (weatherCode === 51 || weatherCode === 53 || weatherCode === 55 || weatherCode === 56 || weatherCode === 57) {
+		return 40;
+	}
+	if (weatherCode === 45 || weatherCode === 48) {
+		return 25;
+	}
+	if (weatherCode === 3) {
+		return 15;
+	}
+	return 5;
+}
+
+function getPrecipitationProbabilities(forecastData) {
+	if (forecastData.hourly.precipitation_probability) {
+		return forecastData.hourly.precipitation_probability.slice(0, HOURS_TO_SHOW);
+	}
+	return forecastData.hourly.weathercode.slice(0, HOURS_TO_SHOW).map(estimatePrecipProbabilityFromWeatherCode);
+}
+
+function estimateCloudCoverFromWeatherCode(weatherCode) {
+	if (weatherCode === 0 || weatherCode === 1) {
+		return 15;
+	}
+	if (weatherCode === 2) {
+		return 45;
+	}
+	if (weatherCode === 3) {
+		return 95;
+	}
+	if (weatherCode === 45 || weatherCode === 48) {
+		return 85;
+	}
+	if (weatherCode >= 51 && weatherCode <= 67) {
+		return 80;
+	}
+	if (weatherCode >= 71 && weatherCode <= 86) {
+		return 75;
+	}
+	if (weatherCode >= 95) {
+		return 90;
+	}
+	return 55;
+}
+
+function getCloudCoverValues(forecastData) {
+	if (forecastData.hourly.cloudcover) {
+		return forecastData.hourly.cloudcover.slice(0, HOURS_TO_SHOW);
+	}
+	return forecastData.hourly.weathercode.slice(0, HOURS_TO_SHOW).map(estimateCloudCoverFromWeatherCode);
+}
+
+function getPercentLegendSettings() {
+	return {
+		min: PERCENT_LEGEND_MIN,
+		max: PERCENT_LEGEND_MAX,
+		swatchCount: PERCENT_LEGEND_SWATCH_COUNT,
+		tickLabels: PERCENT_LEGEND_TICK_LABELS,
+		unitSuffix: '%'
+	};
+}
+
+function getCellValuesFromForecast(forecastData) {
+	if (isPrecipitationGridMode()) {
+		return getPrecipitationProbabilities(forecastData);
+	}
+	if (isCloudCoverGridMode()) {
+		return getCloudCoverValues(forecastData);
+	}
+	return getDisplayTemps(forecastData);
+}
+
+function getLegendForGrid() {
+	if (isPercentOverlayGridMode()) {
+		return getPercentLegendSettings();
+	}
+	return getLegendSettings(gridRuntime.temperatureUnit);
+}
+
+function createScalesForGrid() {
+	if (isPrecipitationGridMode()) {
+		return {
+			overlay: d3.scale.linear()
+				.domain([0, 100])
+				.range([d3.rgb(255, 255, 255), d3.rgb(0, 40, 120)])
+		};
+	}
+	if (isCloudCoverGridMode()) {
+		return {
+			overlay: d3.scale.linear()
+				.domain([0, 100])
+				.range([d3.rgb(255, 255, 255), d3.rgb(55, 55, 55)])
+		};
+	}
+	return createColorScales(gridRuntime.temperatureUnit);
+}
+
+function percentOverlayFill(value, scales) {
+	if (value == null || isNaN(value)) {
+		return d3.rgb(255, 255, 255);
+	}
+	return scales.overlay(Math.max(0, Math.min(100, value)));
+}
+
+function cellFill(cellValues, hourIndex, scales) {
+	if (isPercentOverlayGridMode()) {
+		return percentOverlayFill(cellValues[hourIndex], scales);
+	}
+	return temperatureFill(cellValues, hourIndex, scales);
 }
 
 function fahrenheitToCelsius(f) {
@@ -381,8 +582,60 @@ function cellIndexFontSize(blockSize) {
 	return Math.max(8, Math.min(12, blockSize * 0.24));
 }
 
+function percentOverlayCellFontSize(blockSize, label) {
+	var cellInner = Math.max(blockSize - 2, 8);
+	var charWidthRatio = 0.55;
+	var horizontalPadding = 4;
+	var maxByWidth = Math.floor((cellInner - horizontalPadding) / (label.length * charWidthRatio));
+	var scale = label.length >= 4 ? 0.30 : 0.38;
+	var preferred = Math.round(blockSize * scale);
+	var maxCap = label.length >= 4 ? 14 : 20;
+	return Math.max(7, Math.min(maxByWidth, preferred, maxCap));
+}
+
+function cellValueFontSize(blockSize, cellValue) {
+	if (isPercentOverlayGridMode()) {
+		var value = cellValue != null && !isNaN(cellValue) ? cellValue : 0;
+		return percentOverlayCellFontSize(blockSize, formatPercentCellValue(value));
+	}
+	return cellIndexFontSize(blockSize);
+}
+
 function cellLabelInset(blockSize) {
 	return Math.max(3, Math.round(blockSize * 0.1));
+}
+
+function cellValueLabelAttrs(layout, viewportWidth, hourIndex, cellRect, cellValue) {
+	var fontSize = cellValueFontSize(layout.blockSize, cellValue);
+
+	if (isPercentOverlayGridMode() && !usesCompactIconCellLayout()) {
+		return {
+			fontSize: fontSize,
+			textAnchor: "middle",
+			x: cellRect.x + cellRect.width / 2,
+			y: cellRect.y + cellRect.height / 2,
+			dy: "0.35em"
+		};
+	}
+
+	var inset = cellLabelInset(layout.blockSize);
+	return {
+		fontSize: fontSize,
+		textAnchor: "end",
+		x: cellRect.x + cellRect.width - inset,
+		y: cellRect.y + cellRect.height - inset,
+		dy: null
+	};
+}
+
+function staticCellRect(hourIndex, layout, viewportWidth) {
+	var cellInner = layout.blockSize - 2;
+	return {
+		x: gridX(hourIndex, layout.blockSize, viewportWidth),
+		y: gridY(hourIndex, layout.blockSize),
+		width: cellInner,
+		height: cellInner
+	};
 }
 
 function formatCellTemperature(temp) {
@@ -393,29 +646,95 @@ function formatTemperatureTooltip(temp) {
 	return Math.round(temp) + ' degrees ' + temperatureUnitSuffix() + '.';
 }
 
+function describeWeatherCode(weatherCode) {
+	if (weatherCodeDescriptions.hasOwnProperty(weatherCode)) {
+		return weatherCodeDescriptions[weatherCode];
+	}
+	return 'Unknown conditions';
+}
+
+function formatPrecipitationTooltip(probability, weatherCode) {
+	var lines = [Math.round(probability) + '% chance of precipitation.'];
+	if (weatherCode != null && !isNaN(weatherCode)) {
+		lines.push(describeWeatherCode(weatherCode) + '.');
+	}
+	return lines.join('<br />');
+}
+
+function formatCloudCoverTooltip(cloudCover) {
+	return Math.round(cloudCover) + '% cloud cover.';
+}
+
+function formatPercentCellValue(value) {
+	return Math.round(value) + '%';
+}
+
+function formatCellValue(value) {
+	if (isPercentOverlayGridMode()) {
+		return formatPercentCellValue(value);
+	}
+	return formatCellTemperature(value);
+}
+
+function formatCellTooltip(value, weatherCode) {
+	if (isPrecipitationGridMode()) {
+		return formatPrecipitationTooltip(value, weatherCode);
+	}
+	if (isCloudCoverGridMode()) {
+		return formatCloudCoverTooltip(value);
+	}
+	return formatTemperatureTooltip(value);
+}
+
+function buildGridCellTooltipHtml(date, cellValue, weatherCode) {
+	return weekDays[date.getDay()] + ", " + monthNames[date.getMonth()] + " " + date.getDate() + ", " + formatAMPM(date)
+		+ "<br />" + formatCellTooltip(cellValue, weatherCode);
+}
+
 function buildGridIconCellHtml(weatherCode) {
 	var iconMarkup = gridIconHtml(weatherCode);
-	if (gridRuntime.showTemperatureInCells) {
+	if (usesCompactIconCellLayout()) {
 		return '<div class="grid-icon-corner">' + iconMarkup + '</div>';
 	}
 	return iconMarkup;
 }
 
 function gridIconCellClassName() {
-	return gridRuntime.showTemperatureInCells
+	return usesCompactIconCellLayout()
 		? 'grid-icon-cell grid-icon-cell--compact'
 		: 'grid-icon-cell';
 }
 
+function cellValueTextAnchor() {
+	if (isPercentOverlayGridMode() && !usesCompactIconCellLayout()) {
+		return 'middle';
+	}
+	return 'end';
+}
+
 function applyGridOverlayTextStyle(selection) {
 	selection
-		.attr("fill", "#ffffff")
-		.attr("stroke", "#000000")
-		.attr("stroke-width", 2)
-		.attr("paint-order", "stroke")
 		.attr("font-family", "sans-serif")
 		.attr("font-weight", "bold")
-		.attr("pointer-events", "none");
+		.attr("pointer-events", "none")
+		.attr("paint-order", "stroke")
+		.attr("stroke-width", 2);
+}
+
+function styleCellValueLabel(selection, cellValues) {
+	selection
+		.attr("fill", function (hourIndex) {
+			if (isTemperatureGridMode()) {
+				return "#ffffff";
+			}
+			return cellValues[hourIndex] < 50 ? "#1a2a44" : "#ffffff";
+		})
+		.attr("stroke", function (hourIndex) {
+			if (isTemperatureGridMode()) {
+				return "#000000";
+			}
+			return cellValues[hourIndex] < 50 ? "#ffffff" : "#000000";
+		});
 }
 
 function getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress) {
@@ -444,7 +763,7 @@ function getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProg
 	};
 }
 
-function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgress) {
+function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgress, cellValues) {
 	gridRuntime.introProgress.h = hProgress;
 	gridRuntime.introProgress.v = vProgress;
 
@@ -480,19 +799,28 @@ function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgr
 			});
 	}
 
-	if (gridRuntime.showTemperatureInCells) {
-		var tempFontSize = cellIndexFontSize(layout.blockSize);
-		var tempInset = cellLabelInset(layout.blockSize);
-		animatedLayer.selectAll("text.grid-cell-temp")
-			.attr("font-size", tempFontSize + "px")
-			.attr("text-anchor", "end")
-			.attr("x", function (hourIndex) {
+	if (shouldShowCellValues()) {
+		animatedLayer.selectAll("text.grid-cell-value")
+			.each(function (hourIndex) {
 				var pos = getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress);
-				return pos.x + pos.width - tempInset;
-			})
-			.attr("y", function (hourIndex) {
-				var pos = getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress);
-				return pos.y + pos.height - tempInset;
+				var attrs = cellValueLabelAttrs(
+					layout,
+					viewportWidth,
+					hourIndex,
+					pos,
+					cellValues ? cellValues[hourIndex] : 0
+				);
+				var label = d3.select(this);
+				label
+					.attr("font-size", attrs.fontSize + "px")
+					.attr("text-anchor", attrs.textAnchor)
+					.attr("x", attrs.x)
+					.attr("y", attrs.y);
+				if (attrs.dy) {
+					label.attr("dy", attrs.dy);
+				} else {
+					label.attr("dy", null);
+				}
 			});
 	}
 
@@ -535,27 +863,39 @@ function applyCellIndexLayout(animatedLayer, layout, viewportWidth) {
 		});
 }
 
-function applyCellTempLayout(animatedLayer, layout, viewportWidth, temps) {
-	if (!gridRuntime.showTemperatureInCells) {
+function applyCellValueLayout(animatedLayer, layout, viewportWidth, cellValues) {
+	if (!shouldShowCellValues()) {
 		return;
 	}
 
-	var labelFontSize = cellIndexFontSize(layout.blockSize);
-	var inset = cellLabelInset(layout.blockSize);
-	var cellInner = layout.blockSize - 2;
+	var valueLabels = animatedLayer.selectAll("text.grid-cell-value");
 
-	animatedLayer.selectAll("text.grid-cell-temp")
-		.attr("font-size", labelFontSize + "px")
-		.attr("text-anchor", "end")
-		.attr("x", function (hourIndex) {
-			return gridX(hourIndex, layout.blockSize, viewportWidth) + cellInner - inset;
-		})
-		.attr("y", function (hourIndex) {
-			return gridY(hourIndex, layout.blockSize) + cellInner - inset;
-		})
-		.text(function (hourIndex) {
-			return formatCellTemperature(temps[hourIndex]);
-		});
+	valueLabels.each(function (hourIndex) {
+		var attrs = cellValueLabelAttrs(
+			layout,
+			viewportWidth,
+			hourIndex,
+			staticCellRect(hourIndex, layout, viewportWidth),
+			cellValues[hourIndex]
+		);
+		var label = d3.select(this);
+		label
+			.attr("font-size", attrs.fontSize + "px")
+			.attr("text-anchor", attrs.textAnchor)
+			.attr("x", attrs.x)
+			.attr("y", attrs.y);
+		if (attrs.dy) {
+			label.attr("dy", attrs.dy);
+		} else {
+			label.attr("dy", null);
+		}
+	});
+
+	valueLabels.text(function (hourIndex) {
+		return formatCellValue(cellValues[hourIndex]);
+	});
+
+	styleCellValueLabel(valueLabels, cellValues);
 }
 
 function raiseCellIndexLabelsOnTop(animatedLayer) {
@@ -573,8 +913,8 @@ function raiseCellIndexLabelsOnTop(animatedLayer) {
 	});
 }
 
-function raiseCellTempLabelsOnTop(animatedLayer) {
-	if (!gridRuntime.showTemperatureInCells) {
+function raiseCellValueLabelsOnTop(animatedLayer) {
+	if (!shouldShowCellValues()) {
 		return;
 	}
 
@@ -583,14 +923,14 @@ function raiseCellTempLabelsOnTop(animatedLayer) {
 		return;
 	}
 
-	animatedLayer.selectAll("text.grid-cell-temp").each(function () {
+	animatedLayer.selectAll("text.grid-cell-value").each(function () {
 		layerNode.appendChild(this);
 	});
 }
 
 function raiseGridOverlayLabelsOnTop(animatedLayer) {
 	raiseCellIndexLabelsOnTop(animatedLayer);
-	raiseCellTempLabelsOnTop(animatedLayer);
+	raiseCellValueLabelsOnTop(animatedLayer);
 }
 
 function raiseGridIconsOnTop(animatedLayer) {
@@ -686,7 +1026,7 @@ function setGridCellIntroOpacity(animatedLayer, firstCellOpacity, otherCellsOpac
 }
 
 function setGridChromeOpacity(animatedLayer, opacity) {
-	animatedLayer.selectAll("text.day-row-label, rect.legend-swatch, text.legend-label, foreignObject.grid-icon, rect.grid-cell-current, text.grid-cell-temp")
+	animatedLayer.selectAll("text.day-row-label, rect.legend-swatch, text.legend-label, foreignObject.grid-icon, rect.grid-cell-current, text.grid-cell-value")
 		.attr("opacity", opacity);
 }
 
@@ -717,13 +1057,13 @@ function cancelGridIntro() {
 	}
 }
 
-function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
+function animateGridIntro(animatedLayer, layout, viewportWidth, cellValues, onComplete) {
 	cancelGridIntro();
 	gridRuntime.introComplete = false;
 	gridRuntime.introProgress = { h: 0, v: 0 };
 	setGridChromeOpacity(animatedLayer, 0);
 	setGridCellIntroOpacity(animatedLayer, 0, 0);
-	applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+	applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0, cellValues);
 
 	var phase = "fadeIn";
 	var phaseStart = null;
@@ -737,7 +1077,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 
 		if (phase === "fadeIn") {
 			var fadeProgress = Math.min(elapsed / GRID_INTRO_CELL_FADE_MS, 1);
-			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0, cellValues);
 			setGridCellIntroOpacity(animatedLayer, fadeProgress, 0);
 			if (fadeProgress < 1) {
 				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -750,7 +1090,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 		}
 
 		if (phase === "pause") {
-			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0, cellValues);
 			setGridCellIntroOpacity(animatedLayer, 1, 0);
 			if (elapsed < GRID_INTRO_CELL_PAUSE_MS) {
 				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -763,7 +1103,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 		}
 
 		if (phase === "stackBehind") {
-			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0, cellValues);
 			setAllGridCellOpacity(animatedLayer, 1);
 			animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index").attr("visibility", "visible");
 			phase = "horizontal";
@@ -775,7 +1115,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 		var progress = Math.min(elapsed / GRID_INTRO_DURATION_MS, 1);
 
 		if (phase === "horizontal") {
-			applyIntroFrame(animatedLayer, layout, viewportWidth, progress, 0);
+			applyIntroFrame(animatedLayer, layout, viewportWidth, progress, 0, cellValues);
 			setAllGridCellOpacity(animatedLayer, 1);
 			if (progress < 1) {
 				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -787,7 +1127,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 			return;
 		}
 
-		applyIntroFrame(animatedLayer, layout, viewportWidth, 1, progress);
+		applyIntroFrame(animatedLayer, layout, viewportWidth, 1, progress, cellValues);
 		setAllGridCellOpacity(animatedLayer, 1);
 		if (progress < 1) {
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -803,7 +1143,7 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 	gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
 }
 
-function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout) {
+function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout, cellValues) {
 	if (gridRuntime.skipNextIntro) {
 		gridRuntime.skipNextIntro = false;
 		gridRuntime.introComplete = true;
@@ -825,7 +1165,7 @@ function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout) {
 	setGridCellIntroOpacity(animatedLayer, 0, 0);
 	setGridChromeOpacity(animatedLayer, 0);
 	applyLayout(false, true);
-	animateGridIntro(animatedLayer, layout, viewportWidth, function () {
+	animateGridIntro(animatedLayer, layout, viewportWidth, cellValues, function () {
 		applyLayout(false);
 		raiseGridIconsOnTop(animatedLayer);
 		raiseGridOverlayLabelsOnTop(animatedLayer);
@@ -857,8 +1197,8 @@ function clearGrid() {
 	gridRuntime.activeGrid = null;
 }
 
-function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, tooltip) {
-	var numDays = temps.length / HOURS_PER_DAY;
+function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCodes, tooltip) {
+	var numDays = cellValues.length / HOURS_PER_DAY;
 	var margins = [10, 10, 10, 10];
 
 	var w = window;
@@ -878,9 +1218,9 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 	var animatedLayer = graph.append("svg:g")
 		.attr("class", "animated-layer");
 
-	var legend = getLegendSettings(gridRuntime.temperatureUnit);
-	var scales = createColorScales(gridRuntime.temperatureUnit);
-	var hourOrder = hourIndicesDescending(temps.length);
+	var legend = getLegendForGrid();
+	var scales = createScalesForGrid();
+	var hourOrder = hourIndicesDescending(cellValues.length);
 	var currentHourIndex = findCurrentHourIndex(hourTimes);
 	gridRuntime.currentHourIndex = currentHourIndex;
 
@@ -894,7 +1234,7 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		.attr("y", function (hourIndex) { return gridY(hourIndex, layout.blockSize); })
 		.attr("width", layout.blockSize - 2)
 		.attr("height", layout.blockSize - 2)
-		.attr("fill", function (hourIndex) { return temperatureFill(temps, hourIndex, scales); });
+		.attr("fill", function (hourIndex) { return cellFill(cellValues, hourIndex, scales); });
 
 	var currentHourMarker = animatedLayer.selectAll("rect.grid-cell-current")
 		.data(currentHourIndex >= 0 ? [currentHourIndex] : [], hourIndexDataKey);
@@ -933,46 +1273,58 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		applyCellIndexLayout(animatedLayer, layout, viewportWidth);
 	}
 
-	if (gridRuntime.showTemperatureInCells) {
-		var cellTempLabels = animatedLayer.selectAll("text.grid-cell-temp")
+	if (shouldShowCellValues()) {
+		var cellValueLabels = animatedLayer.selectAll("text.grid-cell-value")
 			.data(hourOrder, hourIndexDataKey);
 
-		cellTempLabels.enter().append("text")
-			.attr("class", "grid-cell-temp")
+		cellValueLabels.enter().append("text")
+			.attr("class", "grid-cell-value")
 			.attr("data-hour-index", function (hourIndex) { return hourIndex; })
-			.attr("text-anchor", "end")
+			.attr("text-anchor", isPercentOverlayGridMode() ? "middle" : "end")
 			.call(applyGridOverlayTextStyle);
 
-		applyCellTempLayout(animatedLayer, layout, viewportWidth, temps);
+		applyCellValueLayout(animatedLayer, layout, viewportWidth, cellValues);
 	}
 
-	var gridIcons = animatedLayer.selectAll("foreignObject.grid-icon")
-		.data(temps, hourDataKey);
+	if (shouldShowWeatherIcons()) {
+		var gridIcons = animatedLayer.selectAll("foreignObject.grid-icon")
+			.data(cellValues, hourDataKey);
 
-	gridIcons.enter().append("foreignObject")
-		.attr("class", "grid-icon")
-		.attr("data-hour-index", function (d, i) { return i; })
-		.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
-		.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
-		.attr("width", cellSize(layout.blockSize))
-		.attr("height", cellSize(layout.blockSize))
-		.append("xhtml:div")
-		.attr("class", gridIconCellClassName)
-		.html(function (d, i) { return buildGridIconCellHtml(weatherCodes[i]); })
-		.on("mouseover", function () {
-			var index = getHourIndex(this.parentNode);
-			var date = hourTimes[index];
-			tooltip.transition().duration(200).style("opacity", 0.9);
-			tooltip.html(
-				weekDays[date.getDay()] + ", " + monthNames[date.getMonth()] + " " + date.getDate() + ", " + formatAMPM(date) + "<br />"
-				+ formatTemperatureTooltip(temps[index])
-			)
-				.style("left", d3.event.pageX + "px")
-				.style("top", (d3.event.pageY - 28) + "px");
-		})
-		.on("mouseout", function () {
-			tooltip.transition().duration(500).style("opacity", 0);
-		});
+		gridIcons.enter().append("foreignObject")
+			.attr("class", "grid-icon")
+			.attr("data-hour-index", function (d, i) { return i; })
+			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
+			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
+			.attr("width", cellSize(layout.blockSize))
+			.attr("height", cellSize(layout.blockSize))
+			.append("xhtml:div")
+			.attr("class", gridIconCellClassName)
+			.html(function (d, i) { return buildGridIconCellHtml(weatherCodes[i]); })
+			.on("mouseover", function () {
+				var index = getHourIndex(this.parentNode);
+				var date = hourTimes[index];
+				tooltip.transition().duration(200).style("opacity", 0.9);
+				tooltip.html(buildGridCellTooltipHtml(date, cellValues[index], weatherCodes[index]))
+					.style("left", d3.event.pageX + "px")
+					.style("top", (d3.event.pageY - 28) + "px");
+			})
+			.on("mouseout", function () {
+				tooltip.transition().duration(500).style("opacity", 0);
+			});
+	} else {
+		animatedLayer.selectAll("rect.grid-cell")
+			.on("mouseover", function () {
+				var index = getHourIndex(this);
+				var date = hourTimes[index];
+				tooltip.transition().duration(200).style("opacity", 0.9);
+				tooltip.html(buildGridCellTooltipHtml(date, cellValues[index], weatherCodes[index]))
+					.style("left", d3.event.pageX + "px")
+					.style("top", (d3.event.pageY - 28) + "px");
+			})
+			.on("mouseout", function () {
+				tooltip.transition().duration(500).style("opacity", 0);
+			});
+	}
 
 	var dayLabels = buildDayLabels(hourTimes, numDays, layout.blockSize);
 	var labelX = rowLabelX(layout.gridLeft);
@@ -1010,7 +1362,7 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		.attr("y", layout.legendBarY)
 		.attr("width", legendSwatchWidth + 0.5)
 		.attr("height", layout.legendBarHeight)
-		.attr("fill", function (d, i) { return temperatureFill(legendTemps, i, scales); });
+		.attr("fill", function (d, i) { return cellFill(legendTemps, i, scales); });
 	legendSwatches = animatedLayer.selectAll("rect.legend-swatch");
 
 	var legendTicks = animatedLayer.selectAll("text.legend-label")
@@ -1057,8 +1409,8 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 			.attr("height", cellSize(layout.blockSize));
 
 		applyCellIndexLayout(animatedLayer, layout, viewportWidth);
-		applyCellTempLayout(animatedLayer, layout, viewportWidth, temps);
-		animatedLayer.selectAll("text.grid-cell-index, text.grid-cell-temp")
+		applyCellValueLayout(animatedLayer, layout, viewportWidth, cellValues);
+		animatedLayer.selectAll("text.grid-cell-index, text.grid-cell-value")
 			.attr("opacity", 1)
 			.attr("visibility", "visible");
 		applyCurrentHourMarker(animatedLayer, layout, viewportWidth, currentHourIndex, 1, 1);
@@ -1072,7 +1424,7 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 			.attr("y", layout.legendBarY)
 			.attr("width", legendSwatchWidth + 0.5)
 			.attr("height", layout.legendBarHeight)
-			.attr("fill", function (d, i) { return temperatureFill(legendTemps, i, scales); });
+			.attr("fill", function (d, i) { return cellFill(legendTemps, i, scales); });
 
 		animatedLayer.selectAll("text.legend-label")
 			.attr("x", function (d) { return legendTickX(d, layout.gridLeft, layout.gridWidth, legend); })
@@ -1118,7 +1470,8 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 					layout,
 					viewportWidth,
 					gridRuntime.introProgress.h,
-					gridRuntime.introProgress.v
+					gridRuntime.introProgress.v,
+					gridRuntime.activeGrid.cellValues
 				);
 				return;
 			}
@@ -1133,9 +1486,10 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		animatedLayer: animatedLayer,
 		layout: layout,
 		viewportWidth: viewportWidth,
-		applyLayout: applyLayout
+		applyLayout: applyLayout,
+		cellValues: cellValues
 	};
-	runGridIntro(animatedLayer, layout, viewportWidth, applyLayout);
+	runGridIntro(animatedLayer, layout, viewportWidth, applyLayout, cellValues);
 }
 
 function wireReplayIntroButton() {
@@ -1163,6 +1517,22 @@ function saveShowTemperatureInCells(value) {
 	}
 }
 
+function loadStoredShowWeatherIconsInPrecip() {
+	try {
+		return localStorage.getItem(PRECIP_ICONS_STORAGE_KEY) === 'true';
+	} catch (err) {
+		return false;
+	}
+}
+
+function saveShowWeatherIconsInPrecip(value) {
+	try {
+		localStorage.setItem(PRECIP_ICONS_STORAGE_KEY, value ? 'true' : 'false');
+	} catch (err) {
+		// ignore storage failures
+	}
+}
+
 function loadStoredTemperatureUnit() {
 	try {
 		var unit = localStorage.getItem(TEMP_UNIT_STORAGE_KEY);
@@ -1177,6 +1547,33 @@ function saveTemperatureUnit(unit) {
 		localStorage.setItem(TEMP_UNIT_STORAGE_KEY, unit === 'celsius' ? 'celsius' : 'fahrenheit');
 	} catch (err) {
 		// ignore storage failures
+	}
+}
+
+function loadStoredGridMode() {
+	try {
+		return normalizeGridMode(localStorage.getItem(GRID_MODE_STORAGE_KEY));
+	} catch (err) {
+		return GRID_MODE_TEMPERATURE;
+	}
+}
+
+function saveGridMode(mode) {
+	try {
+		localStorage.setItem(GRID_MODE_STORAGE_KEY, normalizeGridMode(mode));
+	} catch (err) {
+		// ignore storage failures
+	}
+}
+
+function syncGridOptionsPanel() {
+	var temperatureOnly = document.getElementById('grid-options-temperature-only');
+	if (temperatureOnly) {
+		temperatureOnly.hidden = gridRuntime.gridMode !== GRID_MODE_TEMPERATURE;
+	}
+	var precipitationOnly = document.getElementById('grid-options-precipitation-only');
+	if (precipitationOnly) {
+		precipitationOnly.hidden = gridRuntime.gridMode !== GRID_MODE_PRECIPITATION;
 	}
 }
 
@@ -1201,9 +1598,11 @@ function wireGridOptions() {
 	var toggle = document.getElementById('grid-options-toggle');
 	var panel = document.getElementById('grid-options-panel');
 	var showTempsCheckbox = document.getElementById('grid-options-show-temps');
+	var showPrecipIconsCheckbox = document.getElementById('grid-options-show-precip-icons');
 	var unitInputs = document.querySelectorAll('input[name="grid-options-temp-unit"]');
+	var modeInputs = document.querySelectorAll('input[name="grid-options-grid-mode"]');
 
-	if (!toggle || !panel || !showTempsCheckbox) {
+	if (!toggle || !panel) {
 		return;
 	}
 
@@ -1213,7 +1612,24 @@ function wireGridOptions() {
 	toggle.setAttribute('data-wired', 'true');
 
 	gridRuntime.showTemperatureInCells = loadStoredShowTemperatureInCells();
-	showTempsCheckbox.checked = gridRuntime.showTemperatureInCells;
+	gridRuntime.showWeatherIconsInPrecip = loadStoredShowWeatherIconsInPrecip();
+	gridRuntime.gridMode = loadStoredGridMode();
+	if (showTempsCheckbox) {
+		showTempsCheckbox.checked = gridRuntime.showTemperatureInCells;
+	}
+	if (showPrecipIconsCheckbox) {
+		showPrecipIconsCheckbox.checked = gridRuntime.showWeatherIconsInPrecip;
+	}
+
+	for (var m = 0; m < modeInputs.length; m++) {
+		modeInputs[m].checked = modeInputs[m].value === gridRuntime.gridMode;
+	}
+
+	for (var u = 0; u < unitInputs.length; u++) {
+		unitInputs[u].checked = unitInputs[u].value === gridRuntime.temperatureUnit;
+	}
+
+	syncGridOptionsPanel();
 
 	function setPanelOpen(isOpen) {
 		panel.hidden = !isOpen;
@@ -1232,11 +1648,21 @@ function wireGridOptions() {
 		}
 	});
 
-	showTempsCheckbox.addEventListener('change', function () {
-		gridRuntime.showTemperatureInCells = showTempsCheckbox.checked;
-		saveShowTemperatureInCells(gridRuntime.showTemperatureInCells);
-		reloadWeatherAfterOptionChange();
-	});
+	if (showTempsCheckbox) {
+		showTempsCheckbox.addEventListener('change', function () {
+			gridRuntime.showTemperatureInCells = showTempsCheckbox.checked;
+			saveShowTemperatureInCells(gridRuntime.showTemperatureInCells);
+			reloadWeatherAfterOptionChange();
+		});
+	}
+
+	if (showPrecipIconsCheckbox) {
+		showPrecipIconsCheckbox.addEventListener('change', function () {
+			gridRuntime.showWeatherIconsInPrecip = showPrecipIconsCheckbox.checked;
+			saveShowWeatherIconsInPrecip(gridRuntime.showWeatherIconsInPrecip);
+			reloadWeatherAfterOptionChange();
+		});
+	}
 
 	for (var i = 0; i < unitInputs.length; i++) {
 		unitInputs[i].addEventListener('change', function () {
@@ -1245,6 +1671,18 @@ function wireGridOptions() {
 			}
 			gridRuntime.temperatureUnit = this.value === 'celsius' ? 'celsius' : 'fahrenheit';
 			saveTemperatureUnit(gridRuntime.temperatureUnit);
+			reloadWeatherAfterOptionChange();
+		});
+	}
+
+	for (var g = 0; g < modeInputs.length; g++) {
+		modeInputs[g].addEventListener('change', function () {
+			if (!this.checked) {
+				return;
+			}
+			gridRuntime.gridMode = normalizeGridMode(this.value);
+			saveGridMode(gridRuntime.gridMode);
+			syncGridOptionsPanel();
 			reloadWeatherAfterOptionChange();
 		});
 	}
@@ -1263,11 +1701,11 @@ function initWeatherGrid() {
 function renderWeatherFromForecastData(data) {
 	gridRuntime.lastForecastData = data;
 	var times = data.hourly.time.slice(0, HOURS_TO_SHOW);
-	var temps = getDisplayTemps(data);
+	var cellValues = getCellValuesFromForecast(data);
 	var weatherCodes = data.hourly.weathercode.slice(0, HOURS_TO_SHOW);
 	var hourTimes = times.map(function (t) { return new Date(t); });
 
-	renderWeatherGrid(GRID_CONTAINER, temps, hourTimes, weatherCodes, gridRuntime.tooltip);
+	renderWeatherGrid(GRID_CONTAINER, cellValues, hourTimes, weatherCodes, gridRuntime.tooltip);
 }
 
 function loadWeatherFromForecastData(data) {
@@ -1343,6 +1781,20 @@ window.WeatherGrid = {
 	},
 	get showTemperatureInCells() {
 		return gridRuntime.showTemperatureInCells;
+	},
+	set showWeatherIconsInPrecip(value) {
+		gridRuntime.showWeatherIconsInPrecip = !!value;
+		saveShowWeatherIconsInPrecip(gridRuntime.showWeatherIconsInPrecip);
+	},
+	get showWeatherIconsInPrecip() {
+		return gridRuntime.showWeatherIconsInPrecip;
+	},
+	set gridMode(value) {
+		gridRuntime.gridMode = normalizeGridMode(value);
+		saveGridMode(gridRuntime.gridMode);
+	},
+	get gridMode() {
+		return gridRuntime.gridMode;
 	},
 	set temperatureUnit(value) {
 		gridRuntime.temperatureUnit = value === 'celsius' ? 'celsius' : 'fahrenheit';
