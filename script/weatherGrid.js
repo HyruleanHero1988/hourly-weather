@@ -67,7 +67,7 @@ var gridRuntime = {
 
 const GRID_INTRO_DURATION_MS = 1500;
 const GRID_INTRO_CELL_FADE_MS = 300;
-const GRID_INTRO_CELL_PAUSE_MS = 100;
+const GRID_INTRO_CELL_PAUSE_MS = 300;
 const GRID_CHROME_FADE_MS = 500;
 
 function buildOpenMeteoUrl(latitude, longitude) {
@@ -410,6 +410,18 @@ function hourDataKey(d, i) {
 	return i;
 }
 
+function hourIndexDataKey(hourIndex) {
+	return hourIndex;
+}
+
+function hourIndicesDescending(count) {
+	var indices = [];
+	for (var h = count - 1; h >= 0; h--) {
+		indices.push(h);
+	}
+	return indices;
+}
+
 function getHourIndex(cellNode) {
 	return parseInt(cellNode.getAttribute("data-hour-index"), 10);
 }
@@ -633,27 +645,27 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		.attr("class", "animated-layer");
 
 	var scales = createColorScales();
+	var hourOrder = hourIndicesDescending(temps.length);
 
 	var gridRects = animatedLayer.selectAll("rect.grid-cell")
-		.data(temps, hourDataKey);
+		.data(hourOrder, hourIndexDataKey);
 
 	gridRects.enter().append("svg:rect")
 		.attr("class", "grid-cell")
-		.attr("data-hour-index", function (d, i) { return i; })
-		.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
-		.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
+		.attr("data-hour-index", function (hourIndex) { return hourIndex; })
+		.attr("x", function (hourIndex) { return gridX(hourIndex, layout.blockSize, viewportWidth); })
+		.attr("y", function (hourIndex) { return gridY(hourIndex, layout.blockSize); })
 		.attr("width", layout.blockSize - 2)
 		.attr("height", layout.blockSize - 2)
-		.attr("fill", function (d, i) { return temperatureFill(temps, i, scales); });
+		.attr("fill", function (hourIndex) { return temperatureFill(temps, hourIndex, scales); });
 
 	if (gridRuntime.showCellIndices) {
-		var hourIndices = d3.range(temps.length);
 		var cellIndexLabels = animatedLayer.selectAll("text.grid-cell-index")
-			.data(hourIndices, hourDataKey);
+			.data(hourOrder, hourIndexDataKey);
 
 		cellIndexLabels.enter().append("text")
 			.attr("class", "grid-cell-index")
-			.attr("data-hour-index", function (d) { return d; })
+			.attr("data-hour-index", function (hourIndex) { return hourIndex; })
 			.attr("text-anchor", "middle")
 			.attr("fill", "#ffffff")
 			.attr("stroke", "#000000")
@@ -663,7 +675,7 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 			.attr("font-weight", "bold")
 			.attr("pointer-events", "none")
 			.attr("dy", "0.35em")
-			.text(function (d) { return String(d); });
+			.text(function (hourIndex) { return String(hourIndex); });
 
 		applyCellIndexLayout(animatedLayer, layout, viewportWidth);
 	}
