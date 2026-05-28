@@ -296,41 +296,88 @@ function cellIndexFontSize(blockSize) {
 	return Math.max(8, Math.min(12, blockSize * 0.24));
 }
 
+function getHourRow(hourIndex) {
+	return Math.floor(hourIndex / HOURS_PER_DAY);
+}
+
+function isIntroCellVisible(hourIndex, vProgress) {
+	return vProgress > 0 || getHourRow(hourIndex) === 0;
+}
+
+function getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress) {
+	var originX = gridX(0, layout.blockSize, viewportWidth);
+	var originY = gridY(0, layout.blockSize);
+	var targetX = gridX(hourIndex, layout.blockSize, viewportWidth);
+	var targetY = gridY(hourIndex, layout.blockSize);
+	var size = cellSize(layout.blockSize);
+	var row = getHourRow(hourIndex);
+
+	if (vProgress <= 0) {
+		if (row === 0) {
+			var hEased = easeInOutCubic(hProgress);
+			return {
+				x: originX + (targetX - originX) * hEased,
+				y: originY,
+				width: size,
+				height: size
+			};
+		}
+		return {
+			x: originX,
+			y: originY,
+			width: size,
+			height: size
+		};
+	}
+
+	var vEased = easeInOutCubic(vProgress);
+	return {
+		x: targetX,
+		y: originY + (targetY - originY) * vEased,
+		width: size,
+		height: size
+	};
+}
+
 function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgress) {
 	gridRuntime.introProgress.h = hProgress;
 	gridRuntime.introProgress.v = vProgress;
 
-	var hEased = easeInOutCubic(hProgress);
-	var vEased = easeInOutCubic(vProgress);
-	var originX = gridX(0, layout.blockSize, viewportWidth);
-	var originY = gridY(0, layout.blockSize);
-	var size = cellSize(layout.blockSize);
-
 	animatedLayer.selectAll("rect.grid-cell")
 		.attr("x", function () {
 			var hourIndex = getHourIndex(this);
-			var targetX = gridX(hourIndex, layout.blockSize, viewportWidth);
-			return originX + (targetX - originX) * hEased;
+			return getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress).x;
 		})
 		.attr("y", function () {
 			var hourIndex = getHourIndex(this);
-			var targetY = gridY(hourIndex, layout.blockSize);
-			return originY + (targetY - originY) * vEased;
+			return getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress).y;
 		})
-		.attr("width", size)
-		.attr("height", size);
+		.attr("width", function () {
+			var hourIndex = getHourIndex(this);
+			return getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress).width;
+		})
+		.attr("height", function () {
+			var hourIndex = getHourIndex(this);
+			return getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress).height;
+		})
+		.attr("visibility", function () {
+			return isIntroCellVisible(getHourIndex(this), vProgress) ? "visible" : "hidden";
+		});
 
 	if (gridRuntime.showCellIndices) {
 		var labelFontSize = cellIndexFontSize(layout.blockSize);
 		animatedLayer.selectAll("text.grid-cell-index")
 			.attr("font-size", labelFontSize + "px")
+			.attr("visibility", function (d) {
+				return isIntroCellVisible(d, vProgress) ? "visible" : "hidden";
+			})
 			.attr("x", function (d) {
-				var targetX = gridX(d, layout.blockSize, viewportWidth);
-				return originX + (targetX - originX) * hEased + size / 2;
+				var pos = getCellIntroPosition(d, layout, viewportWidth, hProgress, vProgress);
+				return pos.x + pos.width / 2;
 			})
 			.attr("y", function (d) {
-				var targetY = gridY(d, layout.blockSize);
-				return originY + (targetY - originY) * vEased + size / 2;
+				var pos = getCellIntroPosition(d, layout, viewportWidth, hProgress, vProgress);
+				return pos.y + pos.height / 2;
 			});
 	}
 }
@@ -352,7 +399,33 @@ function applyCellIndexLayout(animatedLayer, layout, viewportWidth) {
 		});
 }
 
-function stackGridCellsFirstOnTop(animatedLayer) {
+function raiseCellIndexLabelsOnTop(animatedLayer) {
+	if (!gridRuntime.showCellIndices) {
+		return;
+	}
+
+	var layerNode = animatedLayer.node();
+	if (!layerNode) {
+		return;
+	}
+
+	animatedLayer.selectAll("text.grid-cell-index").each(function () {
+		layerNode.appendChild(this);
+	});
+}
+
+function raiseGridIconsOnTop(animatedLayer) {
+	var layerNode = animatedLayer.node();
+	if (!layerNode) {
+		return;
+	}
+
+	animatedLayer.selectAll("foreignObject.grid-icon").each(function () {
+		layerNode.appendChild(this);
+	});
+}
+
+function stackGridCellsByIndex(animatedLayer, compareFn) {
 	var layerNode = animatedLayer.node();
 	if (!layerNode) {
 		return;
@@ -362,12 +435,22 @@ function stackGridCellsFirstOnTop(animatedLayer) {
 	animatedLayer.selectAll("rect.grid-cell").each(function () {
 		cells.push({ node: this, index: getHourIndex(this) });
 	});
-	cells.sort(function (a, b) {
-		return b.index - a.index;
-	});
+	cells.sort(compareFn);
 	for (var c = 0; c < cells.length; c++) {
 		layerNode.appendChild(cells[c].node);
 	}
+}
+
+function stackGridCellsFirstOnTop(animatedLayer) {
+	stackGridCellsByIndex(animatedLayer, function (a, b) {
+		return b.index - a.index;
+	});
+}
+
+function stackGridCellsLowestOnTop(animatedLayer) {
+	stackGridCellsByIndex(animatedLayer, function (a, b) {
+		return a.index - b.index;
+	});
 }
 
 function setAllGridCellOpacity(animatedLayer, opacity) {
@@ -382,13 +465,37 @@ function getHourIndex(cellNode) {
 	return parseInt(cellNode.getAttribute("data-hour-index"), 10);
 }
 
+function getIntroCellIndex(node) {
+	if (node.tagName === "text") {
+		var labelIndex = parseInt(node.textContent, 10);
+		if (!isNaN(labelIndex)) {
+			return labelIndex;
+		}
+	}
+	return getHourIndex(node);
+}
+
 function setGridCellIntroOpacity(animatedLayer, firstCellOpacity, otherCellsOpacity) {
-	animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index")
+	animatedLayer.selectAll("rect.grid-cell")
 		.attr("opacity", function () {
 			return getHourIndex(this) === 0 ? firstCellOpacity : otherCellsOpacity;
 		})
 		.attr("visibility", function () {
 			return getHourIndex(this) === 0 || otherCellsOpacity > 0 ? "visible" : "hidden";
+		});
+
+	if (!gridRuntime.showCellIndices) {
+		return;
+	}
+
+	animatedLayer.selectAll("text.grid-cell-index")
+		.attr("opacity", function () {
+			var hourIndex = getIntroCellIndex(this);
+			return hourIndex === 0 ? firstCellOpacity : otherCellsOpacity;
+		})
+		.attr("visibility", function () {
+			var hourIndex = getIntroCellIndex(this);
+			return hourIndex === 0 || otherCellsOpacity > 0 ? "visible" : "hidden";
 		});
 }
 
@@ -411,6 +518,7 @@ function fadeInGridChrome(animatedLayer) {
 			return;
 		}
 		gridRuntime.introFrame = 0;
+		setGridChromeOpacity(animatedLayer, 1);
 	}
 
 	gridRuntime.introFrame = window.requestAnimationFrame(runFadeFrame);
@@ -473,6 +581,8 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 			stackGridCellsFirstOnTop(animatedLayer);
 			setAllGridCellOpacity(animatedLayer, 1);
 			animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index").attr("visibility", "visible");
+			raiseGridIconsOnTop(animatedLayer);
+			raiseCellIndexLabelsOnTop(animatedLayer);
 			phase = "horizontal";
 			phaseStart = null;
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -483,17 +593,23 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 
 		if (phase === "horizontal") {
 			applyIntroFrame(animatedLayer, layout, viewportWidth, progress, 0);
+			setAllGridCellOpacity(animatedLayer, 1);
 			if (progress < 1) {
 				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
 				return;
 			}
 			phase = "vertical";
 			phaseStart = null;
+			stackGridCellsLowestOnTop(animatedLayer);
+			raiseGridIconsOnTop(animatedLayer);
+			raiseCellIndexLabelsOnTop(animatedLayer);
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
 			return;
 		}
 
 		applyIntroFrame(animatedLayer, layout, viewportWidth, 1, progress);
+		raiseGridIconsOnTop(animatedLayer);
+		setAllGridCellOpacity(animatedLayer, 1);
 		if (progress < 1) {
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
 			return;
@@ -523,6 +639,8 @@ function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout) {
 	applyLayout(false, true);
 	animateGridIntro(animatedLayer, layout, viewportWidth, function () {
 		applyLayout(false);
+		raiseGridIconsOnTop(animatedLayer);
+		raiseCellIndexLabelsOnTop(animatedLayer);
 		setGridChromeOpacity(animatedLayer, 0);
 		fadeInGridChrome(animatedLayer);
 	});
@@ -690,6 +808,8 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		.attr("font-family", "sans-serif")
 		.attr("font-size", "12px");
 	legendTicks = animatedLayer.selectAll("text.legend-label");
+	raiseGridIconsOnTop(animatedLayer);
+	raiseCellIndexLabelsOnTop(animatedLayer);
 
 	function applyLayout(refreshDayText, skipCells) {
 		// D3 v2 enter() selections do not include appended nodes; always re-query live nodes.
@@ -719,6 +839,8 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		animatedLayer.selectAll("text.grid-cell-index")
 			.attr("opacity", 1)
 			.attr("visibility", "visible");
+		raiseGridIconsOnTop(animatedLayer);
+		raiseCellIndexLabelsOnTop(animatedLayer);
 
 		legendSwatchWidth = layout.gridWidth / LEGEND_SWATCH_COUNT;
 
