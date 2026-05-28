@@ -296,34 +296,17 @@ function cellIndexFontSize(blockSize) {
 	return Math.max(8, Math.min(12, blockSize * 0.24));
 }
 
-function getHourRow(hourIndex) {
-	return Math.floor(hourIndex / HOURS_PER_DAY);
-}
-
-function isIntroCellVisible(hourIndex, vProgress) {
-	return vProgress > 0 || getHourRow(hourIndex) === 0;
-}
-
 function getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress) {
 	var originX = gridX(0, layout.blockSize, viewportWidth);
 	var originY = gridY(0, layout.blockSize);
 	var targetX = gridX(hourIndex, layout.blockSize, viewportWidth);
 	var targetY = gridY(hourIndex, layout.blockSize);
 	var size = cellSize(layout.blockSize);
-	var row = getHourRow(hourIndex);
 
 	if (vProgress <= 0) {
-		if (row === 0) {
-			var hEased = easeInOutCubic(hProgress);
-			return {
-				x: originX + (targetX - originX) * hEased,
-				y: originY,
-				width: size,
-				height: size
-			};
-		}
+		var hEased = easeInOutCubic(hProgress);
 		return {
-			x: originX,
+			x: originX + (targetX - originX) * hEased,
 			y: originY,
 			width: size,
 			height: size
@@ -359,18 +342,12 @@ function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgr
 		.attr("height", function () {
 			var hourIndex = getHourIndex(this);
 			return getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress).height;
-		})
-		.attr("visibility", function () {
-			return isIntroCellVisible(getHourIndex(this), vProgress) ? "visible" : "hidden";
 		});
 
 	if (gridRuntime.showCellIndices) {
 		var labelFontSize = cellIndexFontSize(layout.blockSize);
 		animatedLayer.selectAll("text.grid-cell-index")
 			.attr("font-size", labelFontSize + "px")
-			.attr("visibility", function (d) {
-				return isIntroCellVisible(d, vProgress) ? "visible" : "hidden";
-			})
 			.attr("x", function (d) {
 				var pos = getCellIntroPosition(d, layout, viewportWidth, hProgress, vProgress);
 				return pos.x + pos.width / 2;
@@ -422,34 +399,6 @@ function raiseGridIconsOnTop(animatedLayer) {
 
 	animatedLayer.selectAll("foreignObject.grid-icon").each(function () {
 		layerNode.appendChild(this);
-	});
-}
-
-function stackGridCellsByIndex(animatedLayer, compareFn) {
-	var layerNode = animatedLayer.node();
-	if (!layerNode) {
-		return;
-	}
-
-	var cells = [];
-	animatedLayer.selectAll("rect.grid-cell").each(function () {
-		cells.push({ node: this, index: getHourIndex(this) });
-	});
-	cells.sort(compareFn);
-	for (var c = 0; c < cells.length; c++) {
-		layerNode.appendChild(cells[c].node);
-	}
-}
-
-function stackGridCellsFirstOnTop(animatedLayer) {
-	stackGridCellsByIndex(animatedLayer, function (a, b) {
-		return b.index - a.index;
-	});
-}
-
-function stackGridCellsLowestOnTop(animatedLayer) {
-	stackGridCellsByIndex(animatedLayer, function (a, b) {
-		return a.index - b.index;
 	});
 }
 
@@ -578,11 +527,8 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 
 		if (phase === "stackBehind") {
 			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
-			stackGridCellsFirstOnTop(animatedLayer);
 			setAllGridCellOpacity(animatedLayer, 1);
 			animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index").attr("visibility", "visible");
-			raiseGridIconsOnTop(animatedLayer);
-			raiseCellIndexLabelsOnTop(animatedLayer);
 			phase = "horizontal";
 			phaseStart = null;
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -600,15 +546,11 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 			}
 			phase = "vertical";
 			phaseStart = null;
-			stackGridCellsLowestOnTop(animatedLayer);
-			raiseGridIconsOnTop(animatedLayer);
-			raiseCellIndexLabelsOnTop(animatedLayer);
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
 			return;
 		}
 
 		applyIntroFrame(animatedLayer, layout, viewportWidth, 1, progress);
-		raiseGridIconsOnTop(animatedLayer);
 		setAllGridCellOpacity(animatedLayer, 1);
 		if (progress < 1) {
 			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
@@ -731,6 +673,7 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 
 	gridIcons.enter().append("foreignObject")
 		.attr("class", "grid-icon")
+		.attr("data-hour-index", function (d, i) { return i; })
 		.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
 		.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
 		.attr("width", cellSize(layout.blockSize))
@@ -738,8 +681,8 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		.append("xhtml:div")
 		.attr("class", "grid-icon-cell")
 		.html(function (d, i) { return gridIconHtml(weatherCodes[i]); })
-		.on("mouseover", function (d, i) {
-			var index = i;
+		.on("mouseover", function () {
+			var index = getHourIndex(this.parentNode);
 			var date = hourTimes[index];
 			tooltip.transition().duration(200).style("opacity", 0.9);
 			tooltip.html(
@@ -822,16 +765,16 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 		}
 
 		animatedLayer.selectAll("rect.grid-cell")
-			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
-			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
+			.attr("x", function () { return gridX(getHourIndex(this), layout.blockSize, viewportWidth); })
+			.attr("y", function () { return gridY(getHourIndex(this), layout.blockSize); })
 			.attr("width", layout.blockSize - 2)
 			.attr("height", layout.blockSize - 2)
 			.attr("opacity", 1)
 			.attr("visibility", "visible");
 
 		animatedLayer.selectAll("foreignObject.grid-icon")
-			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
-			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
+			.attr("x", function () { return gridX(getHourIndex(this), layout.blockSize, viewportWidth); })
+			.attr("y", function () { return gridY(getHourIndex(this), layout.blockSize); })
 			.attr("width", cellSize(layout.blockSize))
 			.attr("height", cellSize(layout.blockSize));
 
