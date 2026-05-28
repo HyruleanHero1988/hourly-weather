@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>16 Day Hourly Temperature (test / fixture)</title>
+	<link rel="shortcut icon" href="favicon.ico" />
+	<link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico" />
+	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+	<link rel="stylesheet" href="css/weather-icons.min.css" />
+	<link rel="stylesheet" href="css/styles.css" />
+
+	<script src="d3.v5.min.js"></script>
+	<script src="d3.v2.js"></script>
+	<script src="script/fixtures/sampleForecast.js"></script>
+	<script src="script/weatherGrid.js"></script>
+	<script src="script/locationSearchTest.js"></script>
+</head>
+
+<body class="main-layout">
+	<h1>16 Day Hourly Temperature (test)</h1>
+
+	<p class="test-mode-banner">Test mode: forecast data is loaded from a local fixture. Open-Meteo is not called.</p>
+
+	<div class="location-search" id="location-search">
+		<label class="location-search-label" for="location-input">Location</label>
+		<div class="location-search-row">
+			<input type="search" id="location-input" name="location" placeholder="Fixture only (Enter reloads grid)"
+				autocomplete="off" spellcheck="false" readonly />
+			<button type="button" id="location-use-geolocation" class="location-geo-btn"
+				title="Reload fixture data" aria-label="Reload fixture data">
+				<span aria-hidden="true">&#8635;</span>
+			</button>
+		</div>
+		<ul id="location-suggestions" class="location-suggestions" hidden></ul>
+	</div>
+
+	<p id="location-display" class="location-display"></p>
+	<p id="weather-status" class="weather-status" aria-live="polite"></p>
+
+	<p class="replay-intro-wrap">
+		<button type="button" id="replay-grid-intro" class="replay-intro-btn">Replay grid animation</button>
+	</p>
+
+	<div id="graph" class="aGraph"></div>
+
+	<p class="test-mode-note">Use <a href="hourly.html">hourly.html</a> for live weather. This page is for animation and UI testing only.</p>
+</body>
+
+</html>

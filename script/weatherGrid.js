@@ -60,10 +60,14 @@ var gridRuntime = {
 	introFrame: 0,
 	introComplete: false,
 	introProgress: { h: 0, v: 0 },
-	activeGrid: null
+	activeGrid: null,
+	useMockData: false,
+	showCellIndices: false
 };
 
 const GRID_INTRO_DURATION_MS = 1500;
+const GRID_INTRO_CELL_FADE_MS = 300;
+const GRID_INTRO_CELL_PAUSE_MS = 100;
 const GRID_CHROME_FADE_MS = 500;
 
 function buildOpenMeteoUrl(latitude, longitude) {
@@ -288,6 +292,10 @@ function easeInOutCubic(t) {
 	return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+function cellIndexFontSize(blockSize) {
+	return Math.max(8, Math.min(12, blockSize * 0.24));
+}
+
 function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgress) {
 	gridRuntime.introProgress.h = hProgress;
 	gridRuntime.introProgress.v = vProgress;
@@ -299,16 +307,89 @@ function applyIntroFrame(animatedLayer, layout, viewportWidth, hProgress, vProgr
 	var size = cellSize(layout.blockSize);
 
 	animatedLayer.selectAll("rect.grid-cell")
-		.attr("x", function (d, i) {
-			var targetX = gridX(i, layout.blockSize, viewportWidth);
+		.attr("x", function () {
+			var hourIndex = getHourIndex(this);
+			var targetX = gridX(hourIndex, layout.blockSize, viewportWidth);
 			return originX + (targetX - originX) * hEased;
 		})
-		.attr("y", function (d, i) {
-			var targetY = gridY(i, layout.blockSize);
+		.attr("y", function () {
+			var hourIndex = getHourIndex(this);
+			var targetY = gridY(hourIndex, layout.blockSize);
 			return originY + (targetY - originY) * vEased;
 		})
 		.attr("width", size)
 		.attr("height", size);
+
+	if (gridRuntime.showCellIndices) {
+		var labelFontSize = cellIndexFontSize(layout.blockSize);
+		animatedLayer.selectAll("text.grid-cell-index")
+			.attr("font-size", labelFontSize + "px")
+			.attr("x", function (d) {
+				var targetX = gridX(d, layout.blockSize, viewportWidth);
+				return originX + (targetX - originX) * hEased + size / 2;
+			})
+			.attr("y", function (d) {
+				var targetY = gridY(d, layout.blockSize);
+				return originY + (targetY - originY) * vEased + size / 2;
+			});
+	}
+}
+
+function applyCellIndexLayout(animatedLayer, layout, viewportWidth) {
+	if (!gridRuntime.showCellIndices) {
+		return;
+	}
+
+	var labelFontSize = cellIndexFontSize(layout.blockSize);
+	var cellInner = layout.blockSize - 2;
+	animatedLayer.selectAll("text.grid-cell-index")
+		.attr("font-size", labelFontSize + "px")
+		.attr("x", function (d) {
+			return gridX(d, layout.blockSize, viewportWidth) + cellInner / 2;
+		})
+		.attr("y", function (d) {
+			return gridY(d, layout.blockSize) + cellInner / 2;
+		});
+}
+
+function stackGridCellsFirstOnTop(animatedLayer) {
+	var layerNode = animatedLayer.node();
+	if (!layerNode) {
+		return;
+	}
+
+	var cells = [];
+	animatedLayer.selectAll("rect.grid-cell").each(function () {
+		cells.push({ node: this, index: getHourIndex(this) });
+	});
+	cells.sort(function (a, b) {
+		return b.index - a.index;
+	});
+	for (var c = 0; c < cells.length; c++) {
+		layerNode.appendChild(cells[c].node);
+	}
+}
+
+function setAllGridCellOpacity(animatedLayer, opacity) {
+	animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index").attr("opacity", opacity);
+}
+
+function hourDataKey(d, i) {
+	return i;
+}
+
+function getHourIndex(cellNode) {
+	return parseInt(cellNode.getAttribute("data-hour-index"), 10);
+}
+
+function setGridCellIntroOpacity(animatedLayer, firstCellOpacity, otherCellsOpacity) {
+	animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index")
+		.attr("opacity", function () {
+			return getHourIndex(this) === 0 ? firstCellOpacity : otherCellsOpacity;
+		})
+		.attr("visibility", function () {
+			return getHourIndex(this) === 0 || otherCellsOpacity > 0 ? "visible" : "hidden";
+		});
 }
 
 function setGridChromeOpacity(animatedLayer, opacity) {
@@ -347,8 +428,10 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 	gridRuntime.introComplete = false;
 	gridRuntime.introProgress = { h: 0, v: 0 };
 	setGridChromeOpacity(animatedLayer, 0);
+	setGridCellIntroOpacity(animatedLayer, 0, 0);
+	applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
 
-	var phase = "horizontal";
+	var phase = "fadeIn";
 	var phaseStart = null;
 
 	function runFrame(timestamp) {
@@ -357,6 +440,45 @@ function animateGridIntro(animatedLayer, layout, viewportWidth, onComplete) {
 		}
 
 		var elapsed = timestamp - phaseStart;
+
+		if (phase === "fadeIn") {
+			var fadeProgress = Math.min(elapsed / GRID_INTRO_CELL_FADE_MS, 1);
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			setGridCellIntroOpacity(animatedLayer, fadeProgress, 0);
+			if (fadeProgress < 1) {
+				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
+				return;
+			}
+			phase = "pause";
+			phaseStart = null;
+			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
+			return;
+		}
+
+		if (phase === "pause") {
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			setGridCellIntroOpacity(animatedLayer, 1, 0);
+			if (elapsed < GRID_INTRO_CELL_PAUSE_MS) {
+				gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
+				return;
+			}
+			phase = "stackBehind";
+			phaseStart = null;
+			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
+			return;
+		}
+
+		if (phase === "stackBehind") {
+			applyIntroFrame(animatedLayer, layout, viewportWidth, 0, 0);
+			stackGridCellsFirstOnTop(animatedLayer);
+			setAllGridCellOpacity(animatedLayer, 1);
+			animatedLayer.selectAll("rect.grid-cell, text.grid-cell-index").attr("visibility", "visible");
+			phase = "horizontal";
+			phaseStart = null;
+			gridRuntime.introFrame = window.requestAnimationFrame(runFrame);
+			return;
+		}
+
 		var progress = Math.min(elapsed / GRID_INTRO_DURATION_MS, 1);
 
 		if (phase === "horizontal") {
@@ -396,6 +518,7 @@ function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout) {
 		.attr("y", originY)
 		.attr("width", originSize)
 		.attr("height", originSize);
+	setGridCellIntroOpacity(animatedLayer, 0, 0);
 	setGridChromeOpacity(animatedLayer, 0);
 	applyLayout(false, true);
 	animateGridIntro(animatedLayer, layout, viewportWidth, function () {
@@ -452,18 +575,41 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 	var scales = createColorScales();
 
 	var gridRects = animatedLayer.selectAll("rect.grid-cell")
-		.data(temps, String);
+		.data(temps, hourDataKey);
 
 	gridRects.enter().append("svg:rect")
 		.attr("class", "grid-cell")
+		.attr("data-hour-index", function (d, i) { return i; })
 		.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
 		.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
 		.attr("width", layout.blockSize - 2)
 		.attr("height", layout.blockSize - 2)
 		.attr("fill", function (d, i) { return temperatureFill(temps, i, scales); });
 
+	if (gridRuntime.showCellIndices) {
+		var hourIndices = d3.range(temps.length);
+		var cellIndexLabels = animatedLayer.selectAll("text.grid-cell-index")
+			.data(hourIndices, hourDataKey);
+
+		cellIndexLabels.enter().append("text")
+			.attr("class", "grid-cell-index")
+			.attr("data-hour-index", function (d) { return d; })
+			.attr("text-anchor", "middle")
+			.attr("fill", "#ffffff")
+			.attr("stroke", "#000000")
+			.attr("stroke-width", 2)
+			.attr("paint-order", "stroke")
+			.attr("font-family", "sans-serif")
+			.attr("font-weight", "bold")
+			.attr("pointer-events", "none")
+			.attr("dy", "0.35em")
+			.text(function (d) { return String(d); });
+
+		applyCellIndexLayout(animatedLayer, layout, viewportWidth);
+	}
+
 	var gridIcons = animatedLayer.selectAll("foreignObject.grid-icon")
-		.data(temps, String);
+		.data(temps, hourDataKey);
 
 	gridIcons.enter().append("foreignObject")
 		.attr("class", "grid-icon")
@@ -559,13 +705,20 @@ function renderWeatherGrid(containerSelector, temps, hourTimes, weatherCodes, to
 			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
 			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
 			.attr("width", layout.blockSize - 2)
-			.attr("height", layout.blockSize - 2);
+			.attr("height", layout.blockSize - 2)
+			.attr("opacity", 1)
+			.attr("visibility", "visible");
 
 		animatedLayer.selectAll("foreignObject.grid-icon")
 			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
 			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
 			.attr("width", cellSize(layout.blockSize))
 			.attr("height", cellSize(layout.blockSize));
+
+		applyCellIndexLayout(animatedLayer, layout, viewportWidth);
+		animatedLayer.selectAll("text.grid-cell-index")
+			.attr("opacity", 1)
+			.attr("visibility", "visible");
 
 		legendSwatchWidth = layout.gridWidth / LEGEND_SWATCH_COUNT;
 
@@ -657,7 +810,40 @@ function initWeatherGrid() {
 	wireReplayIntroButton();
 }
 
+function renderWeatherFromForecastData(data) {
+	var times = data.hourly.time.slice(0, HOURS_TO_SHOW);
+	var temps = data.hourly.temperature_2m.slice(0, HOURS_TO_SHOW);
+	var weatherCodes = data.hourly.weathercode.slice(0, HOURS_TO_SHOW);
+	var hourTimes = times.map(function (t) { return new Date(t); });
+
+	renderWeatherGrid(GRID_CONTAINER, temps, hourTimes, weatherCodes, gridRuntime.tooltip);
+}
+
+function loadWeatherFromForecastData(data) {
+	var loadId = ++gridRuntime.loadGeneration;
+
+	clearGrid();
+
+	return Promise.resolve(data).then(function (forecast) {
+		if (loadId !== gridRuntime.loadGeneration) {
+			return;
+		}
+		renderWeatherFromForecastData(forecast);
+	});
+}
+
+function loadMockWeather() {
+	if (!window.SAMPLE_FORECAST) {
+		return Promise.reject(new Error('SAMPLE_FORECAST fixture is not loaded'));
+	}
+	return loadWeatherFromForecastData(window.SAMPLE_FORECAST);
+}
+
 function loadWeatherForLocation(location) {
+	if (gridRuntime.useMockData) {
+		return loadMockWeather();
+	}
+
 	var lat = location.latitude;
 	var lon = location.longitude;
 	var loadId = ++gridRuntime.loadGeneration;
@@ -675,19 +861,27 @@ function loadWeatherForLocation(location) {
 			if (loadId !== gridRuntime.loadGeneration) {
 				return;
 			}
-			var times = data.hourly.time.slice(0, HOURS_TO_SHOW);
-			var temps = data.hourly.temperature_2m.slice(0, HOURS_TO_SHOW);
-			var weatherCodes = data.hourly.weathercode.slice(0, HOURS_TO_SHOW);
-			var hourTimes = times.map(function (t) { return new Date(t); });
-
-			renderWeatherGrid(GRID_CONTAINER, temps, hourTimes, weatherCodes, gridRuntime.tooltip);
+			renderWeatherFromForecastData(data);
 		});
 }
 
 window.WeatherGrid = {
 	init: initWeatherGrid,
 	load: loadWeatherForLocation,
-	replayIntro: replayGridIntro
+	loadMock: loadMockWeather,
+	replayIntro: replayGridIntro,
+	set useMockData(value) {
+		gridRuntime.useMockData = !!value;
+	},
+	get useMockData() {
+		return gridRuntime.useMockData;
+	},
+	set showCellIndices(value) {
+		gridRuntime.showCellIndices = !!value;
+	},
+	get showCellIndices() {
+		return gridRuntime.showCellIndices;
+	}
 };
 
 // Pages without location search load a default grid; pages with #location-input use locationSearch.js.

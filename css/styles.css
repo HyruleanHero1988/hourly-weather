@@ -94,6 +94,30 @@ div.tooltip {
 	pointer-events: none;
 }
 
+.test-mode-banner {
+	text-align: center;
+	margin: 0 1rem 0.75em;
+	padding: 0.5em 0.75em;
+	font-family: arial, sans-serif;
+	font-size: 0.9rem;
+	color: #e8eef4;
+	background: #2a3a4a;
+	border: 1px solid #556677;
+	border-radius: 6px;
+}
+
+.test-mode-note {
+	text-align: center;
+	font-family: arial, sans-serif;
+	font-size: 0.85rem;
+	color: #8899aa;
+	margin: 1em 1rem 2em;
+}
+
+.test-mode-note a {
+	color: lightsteelblue;
+}
+
 .replay-intro-wrap {
 	text-align: center;
 	margin: 0 0 0.75em;
