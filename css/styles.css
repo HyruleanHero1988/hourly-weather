@@ -2,6 +2,13 @@
 	color: black;
 }
 
+rect.grid-cell-current {
+	stroke: #e8eef4;
+	stroke-width: 3px;
+	paint-order: stroke fill;
+	vector-effect: non-scaling-stroke;
+}
+
 foreignObject.grid-icon {
 	overflow: visible;
 }
@@ -118,8 +125,11 @@ div.tooltip {
 	color: lightsteelblue;
 }
 
-.replay-intro-wrap {
-	text-align: center;
+.grid-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
 	margin: 0 0 0.75em;
 }
 
@@ -136,6 +146,111 @@ div.tooltip {
 
 .replay-intro-btn:hover {
 	background: #2a2a2a;
+}
+
+.grid-options {
+	position: relative;
+}
+
+.grid-options-toggle {
+	width: 2.75rem;
+	height: 2.75rem;
+	padding: 0;
+	font-size: 1.35rem;
+	line-height: 1;
+	border: 1px solid #555;
+	border-radius: 6px;
+	background: #222;
+	color: lightsteelblue;
+	cursor: pointer;
+}
+
+.grid-options-toggle:hover,
+.grid-options-toggle:focus {
+	background: #333;
+	outline: 2px solid lightsteelblue;
+	outline-offset: 1px;
+}
+
+.grid-options-panel {
+	position: absolute;
+	top: calc(100% + 0.35rem);
+	right: 0;
+	z-index: 200;
+	min-width: 14rem;
+	padding: 0.65rem 0.75rem;
+	background: #222;
+	border: 1px solid #555;
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.grid-options-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-family: arial, sans-serif;
+	font-size: 0.9rem;
+	color: lightsteelblue;
+	cursor: pointer;
+}
+
+.grid-options-item input {
+	accent-color: lightsteelblue;
+}
+
+.grid-options-fieldset {
+	margin: 0.75rem 0 0;
+	padding: 0.6rem 0 0;
+	border: none;
+	border-top: 1px solid #444;
+}
+
+.grid-options-fieldset-legend {
+	padding: 0;
+	font-family: arial, sans-serif;
+	font-size: 0.8rem;
+	color: #8899aa;
+}
+
+.grid-options-fieldset .grid-options-item + .grid-options-item {
+	margin-top: 0.35rem;
+}
+
+.grid-icon-cell--compact {
+	position: relative;
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.grid-icon-cell--compact .grid-icon-corner {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 55%;
+	height: 55%;
+	display: flex;
+	align-items: flex-start;
+	justify-content: flex-start;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.grid-icon-cell--compact .grid-icon-corner .grid-glyph-box,
+.grid-icon-cell--compact .grid-icon-corner .wi {
+	width: 100%;
+	height: 100%;
+	font-size: 0.75rem;
+}
+
+.grid-icon-cell--compact .grid-icon-corner .grid-weather-svg {
+	width: 100%;
+	height: 100%;
+}
+
+text.grid-cell-temp {
+	pointer-events: none;
 }
 
 .aGraph {
