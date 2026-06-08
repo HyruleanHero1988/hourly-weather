@@ -77,10 +77,21 @@ const FORECAST_DAYS = 16;
 const HOURS_PER_DAY = 24;
 const HOURS_TO_SHOW = FORECAST_DAYS * HOURS_PER_DAY;
 const BLOCK_SIZE_DIVIDER = 40;
+const MOBILE_LAYOUT_BREAKPOINT = 640;
+const MOBILE_HOURS_PER_ROW = 6;
+const DESKTOP_HOURS_PER_ROW = HOURS_PER_DAY;
+const MOBILE_MIN_LABEL_WIDTH = 76;
+const MOBILE_LANDSCAPE_LABEL_WIDTH = 58;
+const MOBILE_GRID_EDGE_PADDING = 2;
+const MOBILE_GRID_RIGHT_MARGIN = 12;
+const FULL_WIDTH_LEGEND_INSET = 4;
 const LEGEND_MIN_TEMP = -10;
 const LEGEND_MAX_TEMP = 110;
 const LEGEND_SWATCH_COUNT = 120;
 const LEGEND_TICK_LABELS = [-10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110];
+const COMPACT_TEMP_LEGEND_TICK_LABELS = [-10, 0, 20, 40, 60, 80, 110];
+const COMPACT_PERCENT_LEGEND_TICK_LABELS = [0, 20, 40, 60, 80, 100];
+const COMPACT_LEGEND_LABEL_GAP = 6;
 const GRID_CONTAINER = '#graph';
 const DEFAULT_ICON_MODE = 'glyph';
 const OPTIONS_STORAGE_KEY = 'hourlyWeather.showTemperatureInCells';
@@ -509,12 +520,87 @@ function createColorScales(unit) {
 	};
 }
 
-function gridX(i, blockSize, viewportWidth) {
-	return (i % HOURS_PER_DAY + 1) * blockSize + viewportWidth / 2 - (blockSize * 14);
+function isTouchPrimaryDevice() {
+	return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 }
 
-function gridY(i, blockSize) {
-	return (Math.floor(i / HOURS_PER_DAY) + 1) * blockSize;
+function getViewportHeight() {
+	return window.innerHeight || document.documentElement.clientHeight || 0;
+}
+
+function getViewportWidth() {
+	if (window.visualViewport && window.visualViewport.width > 0) {
+		return Math.floor(window.visualViewport.width);
+	}
+	var docEl = document.documentElement;
+	var body = document.body;
+	return docEl.clientWidth || window.innerWidth || (body && body.clientWidth) || 0;
+}
+
+function getGridContainerWidth(containerSelector) {
+	var container = document.querySelector(containerSelector);
+	if (container && container.clientWidth > 0) {
+		return container.clientWidth;
+	}
+	return getViewportWidth();
+}
+
+function fitFullWidthBlockSize(viewportWidth, labelMinWidth, hoursPerRow, rightMargin) {
+	var blockSize = Math.max(8, Math.floor((viewportWidth - labelMinWidth - rightMargin) / hoursPerRow));
+	var dayLabelWidth = Math.max(labelMinWidth, viewportWidth - (blockSize * hoursPerRow) - rightMargin);
+
+	while (dayLabelWidth + (hoursPerRow * blockSize) > viewportWidth - rightMargin && blockSize > 8) {
+		blockSize--;
+		dayLabelWidth = Math.max(labelMinWidth, viewportWidth - (blockSize * hoursPerRow) - rightMargin);
+	}
+
+	return {
+		blockSize: blockSize,
+		dayLabelWidth: dayLabelWidth
+	};
+}
+
+function usesLandscapeTouchGridLayout(viewportWidth) {
+	var viewportHeight = getViewportHeight();
+	if (viewportWidth < viewportHeight) {
+		return false;
+	}
+	if (isTouchPrimaryDevice()) {
+		return true;
+	}
+	return viewportHeight <= MOBILE_LAYOUT_BREAKPOINT;
+}
+
+function usesCompactGridLayout(viewportWidth) {
+	if (usesLandscapeTouchGridLayout(viewportWidth)) {
+		return false;
+	}
+	var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+	if (viewportWidth >= viewportHeight) {
+		return false;
+	}
+	return viewportWidth < MOBILE_LAYOUT_BREAKPOINT;
+}
+
+function gridColumn(hourIndex, hoursPerRow) {
+	return (hourIndex % HOURS_PER_DAY) % hoursPerRow;
+}
+
+function gridRow(hourIndex, layout) {
+	var day = Math.floor(hourIndex / HOURS_PER_DAY);
+	var segment = Math.floor((hourIndex % HOURS_PER_DAY) / layout.hoursPerRow);
+	return day * layout.rowsPerDay + segment;
+}
+
+function gridX(hourIndex, layout, viewportWidth) {
+	if (layout.isFullWidth) {
+		return layout.gridLeft + gridColumn(hourIndex, layout.hoursPerRow) * layout.blockSize;
+	}
+	return (hourIndex % HOURS_PER_DAY + 1) * layout.blockSize + viewportWidth / 2 - (layout.blockSize * 14);
+}
+
+function gridY(hourIndex, layout) {
+	return (gridRow(hourIndex, layout) + 1) * layout.blockSize;
 }
 
 function cellSize(blockSize) {
@@ -529,21 +615,101 @@ function gridIconHtml(weatherCode) {
 	return '<span class="grid-glyph-box"><i class="wi ' + iconClass + '"></i></span>';
 }
 
-function rowLabelY(dayIndex, blockSize) {
-	return (dayIndex + 1) * blockSize + blockSize / 2;
+function rowLabelY(dayIndex, layout) {
+	return (dayIndex + 1) * layout.blockSize + layout.blockSize / 2;
 }
 
-function rowLabelX(gridLeft) {
-	return gridLeft - 8;
+function rowLabelX(layout) {
+	if (layout.isLandscapeTouch) {
+		return MOBILE_GRID_EDGE_PADDING;
+	}
+	return layout.gridLeft - 8;
+}
+
+function rowLabelTextAnchor(layout) {
+	return layout.isLandscapeTouch ? 'start' : 'end';
+}
+
+function segmentRowLabelY(globalRow, layout) {
+	return (globalRow + 1) * layout.blockSize + layout.blockSize / 2;
+}
+
+function segmentRowLabelX(layout) {
+	return MOBILE_GRID_EDGE_PADDING;
 }
 
 function rowLabelFontSize(blockSize) {
 	return Math.max(10, Math.min(14, blockSize * 0.28));
 }
 
-function buildDayLabels(hourTimes, numDays, blockSize) {
+function compactDayLabelFontSize(blockSize) {
+	return Math.max(8, Math.min(11, blockSize * 0.2));
+}
+
+function compactTimeLabelFontSize(blockSize) {
+	return Math.max(9, Math.min(12, blockSize * 0.24));
+}
+
+function formatHourLabelVerbose(hour) {
+	var hour12 = hour % 12;
+	hour12 = hour12 ? hour12 : 12;
+	return hour12 + (hour < 12 ? 'am' : 'pm');
+}
+
+function formatSegmentRange(segmentIndex, hoursPerRow) {
+	var startHour = segmentIndex * hoursPerRow;
+	var endHour = startHour + hoursPerRow;
+	var endLabel = endHour === HOURS_PER_DAY ? '12am' : formatHourLabelVerbose(endHour);
+	return formatHourLabelVerbose(startHour) + ' - ' + endLabel;
+}
+
+function buildCompactRowLabels(hourTimes, numDays, layout) {
 	var labels = [];
-	var useFullWeekday = blockSize >= 22;
+
+	for (var day = 0; day < numDays; day++) {
+		var date = hourTimes[day * HOURS_PER_DAY];
+		for (var segment = 0; segment < layout.rowsPerDay; segment++) {
+			labels.push({
+				globalRow: day * layout.rowsPerDay + segment,
+				weekday: weekDaysShort[date.getDay()],
+				dateLine: monthNamesShort[date.getMonth()] + ' ' + date.getDate(),
+				timeRange: formatSegmentRange(segment, layout.hoursPerRow)
+			});
+		}
+	}
+	return labels;
+}
+
+function appendCompactRowLabelTspans(textSelection, label, layout) {
+	var labelX = segmentRowLabelX(layout);
+	var dayFontSize = compactDayLabelFontSize(layout.blockSize);
+	var timeFontSize = compactTimeLabelFontSize(layout.blockSize);
+
+	textSelection.selectAll('tspan').remove();
+	textSelection.append('tspan')
+		.attr('x', labelX)
+		.attr('dy', '-0.5em')
+		.attr('font-size', dayFontSize + 'px')
+		.text(label.weekday + ' ' + label.dateLine);
+	textSelection.append('tspan')
+		.attr('x', labelX)
+		.attr('dy', '1em')
+		.attr('font-size', timeFontSize + 'px')
+		.text(label.timeRange);
+}
+
+function syncCompactRowLabelTspans(textSelection, label, layout, refreshText) {
+	var labelX = segmentRowLabelX(layout);
+	if (refreshText || textSelection.selectAll('tspan').empty()) {
+		appendCompactRowLabelTspans(textSelection, label, layout);
+		return;
+	}
+	textSelection.selectAll('tspan').attr('x', labelX);
+}
+
+function buildDayLabels(hourTimes, numDays, layout) {
+	var labels = [];
+	var useFullWeekday = !layout.isCompact && !layout.isLandscapeTouch && layout.blockSize >= 22;
 
 	for (var day = 0; day < numDays; day++) {
 		var date = hourTimes[day * HOURS_PER_DAY];
@@ -576,9 +742,70 @@ function syncDayLabelTspans(textSelection, labelX, label, refreshText) {
 	textSelection.selectAll('tspan').attr('x', labelX);
 }
 
-function getGridBounds(blockSize, viewportWidth) {
-	var gridLeft = gridX(0, blockSize, viewportWidth);
-	var gridRight = gridX(HOURS_PER_DAY - 1, blockSize, viewportWidth) + blockSize - 2;
+function syncGridRowLabels(animatedLayer, hourTimes, numDays, layout, refreshText) {
+	if (layout.isCompact) {
+		animatedLayer.selectAll('text.day-row-label').remove();
+		var segmentLabels = buildCompactRowLabels(hourTimes, numDays, layout);
+		var segmentRowLabels = animatedLayer.selectAll('text.segment-row-label')
+			.data(segmentLabels, function (d) { return d.globalRow; });
+
+		segmentRowLabels.enter().append('text')
+			.attr('class', 'segment-row-label')
+			.attr('text-anchor', 'start')
+			.attr('fill', 'LightSteelBlue')
+			.attr('font-family', 'sans-serif')
+			.attr('x', segmentRowLabelX(layout))
+			.attr('y', function (d) { return segmentRowLabelY(d.globalRow, layout); })
+			.each(function (d) {
+				appendCompactRowLabelTspans(d3.select(this), d, layout);
+			});
+
+		segmentRowLabels
+			.attr('x', segmentRowLabelX(layout))
+			.attr('y', function (d) { return segmentRowLabelY(d.globalRow, layout); })
+			.each(function (d) {
+				syncCompactRowLabelTspans(d3.select(this), d, layout, refreshText);
+			});
+
+		segmentRowLabels.exit().remove();
+		return;
+	}
+
+	animatedLayer.selectAll('text.segment-row-label').remove();
+	var dayLabels = buildDayLabels(hourTimes, numDays, layout);
+	var labelX = rowLabelX(layout);
+	var labelFontSize = rowLabelFontSize(layout.blockSize);
+	var dayRowLabels = animatedLayer.selectAll('text.day-row-label')
+		.data(dayLabels, function (d) { return d.dayIndex; });
+
+	dayRowLabels.enter().append('text')
+		.attr('class', 'day-row-label')
+		.attr('text-anchor', rowLabelTextAnchor(layout))
+		.attr('fill', 'LightSteelBlue')
+		.attr('font-family', 'sans-serif')
+		.attr('font-size', labelFontSize + 'px')
+		.attr('x', labelX)
+		.attr('y', function (d) { return rowLabelY(d.dayIndex, layout); })
+		.each(function (d) {
+			appendDayLabelTspans(d3.select(this), labelX, d);
+		});
+
+	dayRowLabels
+		.attr('text-anchor', rowLabelTextAnchor(layout))
+		.attr('font-size', labelFontSize + 'px')
+		.attr('x', labelX)
+		.attr('y', function (d) { return rowLabelY(d.dayIndex, layout); })
+		.each(function (d) {
+			syncDayLabelTspans(d3.select(this), labelX, d, refreshText);
+		});
+
+	dayRowLabels.exit().remove();
+}
+
+function getGridBounds(layout, viewportWidth) {
+	var lastHourInRow = layout.hoursPerRow - 1;
+	var gridLeft = gridX(0, layout, viewportWidth);
+	var gridRight = gridX(lastHourInRow, layout, viewportWidth) + layout.blockSize - 2;
 	return {
 		gridLeft: gridLeft,
 		gridWidth: gridRight - gridLeft
@@ -589,8 +816,166 @@ function legendTempToFraction(temp, legend) {
 	return (temp - legend.min) / (legend.max - legend.min);
 }
 
-function legendTickX(temp, gridLeft, gridWidth, legend) {
-	return gridLeft + legendTempToFraction(temp, legend) * gridWidth;
+function applyLegendBand(layout, viewportWidth) {
+	if (layout.isCompact) {
+		layout.legendLeft = MOBILE_GRID_EDGE_PADDING;
+		layout.legendWidth = viewportWidth - MOBILE_GRID_EDGE_PADDING - MOBILE_GRID_RIGHT_MARGIN;
+		return;
+	}
+	layout.legendLeft = layout.gridLeft;
+	layout.legendWidth = layout.gridWidth;
+}
+
+function legendDisplayTickLabels(legend, layout) {
+	if (!layout.isCompact) {
+		return legend.tickLabels;
+	}
+	if (legend.unitSuffix === 'F') {
+		return COMPACT_TEMP_LEGEND_TICK_LABELS;
+	}
+	if (legend.unitSuffix === '%') {
+		return COMPACT_PERCENT_LEGEND_TICK_LABELS;
+	}
+	return legend.tickLabels;
+}
+
+function legendLabelText(value, legend, layout) {
+	if (layout.isCompact) {
+		return value + legend.unitSuffix;
+	}
+	return value + ' ' + legend.unitSuffix;
+}
+
+function estimateLegendLabelWidth(value, legend, layout) {
+	var fontSize = legendLabelFontSize(layout);
+	return Math.max(20, legendLabelText(value, legend, layout).length * fontSize * 0.65);
+}
+
+function legendLabelLeftEdge(layoutEntry, value, legend, layout) {
+	if (layoutEntry.anchor === 'end') {
+		return layoutEntry.x - estimateLegendLabelWidth(value, legend, layout);
+	}
+	if (layoutEntry.anchor === 'middle') {
+		return layoutEntry.x - (estimateLegendLabelWidth(value, legend, layout) / 2);
+	}
+	return layoutEntry.x;
+}
+
+function legendLabelRightEdge(layoutEntry, value, legend, layout) {
+	return legendLabelLeftEdge(layoutEntry, value, legend, layout) + estimateLegendLabelWidth(value, legend, layout);
+}
+
+function resolveCompactLegendOverlaps(layouts, tickLabels, legend, layout, left, right) {
+	var lastIndex = tickLabels.length - 1;
+	if (lastIndex < 1) {
+		return;
+	}
+
+	var lastEntry = layouts[lastIndex];
+	var lastLeft = legendLabelLeftEdge(lastEntry, tickLabels[lastIndex], legend, layout);
+
+	for (var j = lastIndex - 1; j >= 1; j--) {
+		var entry = layouts[j];
+		var labelWidth = estimateLegendLabelWidth(tickLabels[j], legend, layout);
+		var maxStart = lastLeft - COMPACT_LEGEND_LABEL_GAP - labelWidth;
+		var minStart = layouts[j - 1].x + estimateLegendLabelWidth(tickLabels[j - 1], legend, layout) + COMPACT_LEGEND_LABEL_GAP;
+
+		if (entry.x > maxStart) {
+			entry.x = Math.max(minStart, maxStart);
+		}
+
+		lastLeft = entry.x;
+	}
+}
+
+function getLegendTickLayouts(tickLabels, legend, layout) {
+	var inset = layout.isCompact || layout.isLandscapeTouch ? FULL_WIDTH_LEGEND_INSET : 0;
+	var left = layout.legendLeft + inset;
+	var right = layout.legendLeft + layout.legendWidth - inset;
+	var drawWidth = Math.max(0, right - left);
+	var layouts = [];
+	var lastIndex = tickLabels.length - 1;
+	var lastLabelWidth = estimateLegendLabelWidth(tickLabels[lastIndex], legend, layout);
+
+	for (var i = 0; i < tickLabels.length; i++) {
+		var label = tickLabels[i];
+		var anchor = legendTickAnchor(i, tickLabels.length);
+		var x = left + legendTempToFraction(label, legend) * drawWidth;
+		var labelWidth = estimateLegendLabelWidth(label, legend, layout);
+
+		if (layout.isCompact) {
+			if (i === 0) {
+				anchor = 'start';
+				x = left;
+			} else if (i === lastIndex) {
+				anchor = 'end';
+				x = right;
+			} else {
+				anchor = 'start';
+				var prev = layouts[i - 1];
+				var minX = legendLabelRightEdge(prev, tickLabels[i - 1], legend, layout) + COMPACT_LEGEND_LABEL_GAP;
+				var maxX = right - lastLabelWidth - COMPACT_LEGEND_LABEL_GAP - labelWidth;
+				x = Math.max(minX, Math.min(x, maxX));
+			}
+		}
+
+		layouts.push({
+			label: label,
+			x: x,
+			anchor: anchor
+		});
+	}
+
+	if (layout.isCompact) {
+		resolveCompactLegendOverlaps(layouts, tickLabels, legend, layout, left, right);
+	}
+
+	return layouts;
+}
+
+function legendSwatchDrawWidth(index, legendSwatchWidth, legendLeft, legendWidth) {
+	var x = legendLeft + (index * legendSwatchWidth);
+	var bandRight = legendLeft + legendWidth;
+	return Math.max(0, Math.min(legendSwatchWidth + 0.5, bandRight - x));
+}
+
+function legendLabelFontSize(layout) {
+	if (layout.isCompact) {
+		return Math.max(9, Math.min(11, layout.blockSize * 0.28));
+	}
+	if (layout.isFullWidth) {
+		return Math.max(8, Math.min(11, layout.blockSize * 0.3));
+	}
+	return 12;
+}
+
+function syncLegendChrome(animatedLayer, layout, legend, legendTemps, scales) {
+	var legendTickLabels = legendDisplayTickLabels(legend, layout);
+	var legendSwatchWidth = layout.legendWidth / legend.swatchCount;
+
+	animatedLayer.selectAll("rect.legend-swatch")
+		.attr("x", function (d, i) { return layout.legendLeft + (i * legendSwatchWidth); })
+		.attr("y", layout.legendBarY)
+		.attr("width", function (d, i) { return legendSwatchDrawWidth(i, legendSwatchWidth, layout.legendLeft, layout.legendWidth); })
+		.attr("height", layout.legendBarHeight)
+		.attr("fill", function (d, i) { return cellFill(legendTemps, i, scales); });
+
+	var legendTickLayouts = getLegendTickLayouts(legendTickLabels, legend, layout);
+	var legendTicks = animatedLayer.selectAll("text.legend-label").data(legendTickLayouts, function (d) { return d.label; });
+	legendTicks.enter().append("text")
+		.attr("class", "legend-label")
+		.attr("fill", "#e8eef4")
+		.attr("stroke", "#1a1a1a")
+		.attr("stroke-width", layout.isCompact ? 2 : 3)
+		.attr("paint-order", "stroke")
+		.attr("font-family", "sans-serif");
+	legendTicks
+		.text(function (d) { return legendLabelText(d.label, legend, layout); })
+		.attr("x", function (d) { return d.x; })
+		.attr("y", layout.legendLabelY)
+		.attr("text-anchor", function (d) { return d.anchor; })
+		.attr("font-size", legendLabelFontSize(layout) + "px");
+	legendTicks.exit().remove();
 }
 
 function legendTickAnchor(index, tickCount) {
@@ -604,24 +989,61 @@ function legendTickAnchor(index, tickCount) {
 }
 
 function computeLayout(viewportWidth, numDays) {
-	var blockSize = viewportWidth / BLOCK_SIZE_DIVIDER;
-	var gridBounds = getGridBounds(blockSize, viewportWidth);
-	var gridBottom = (numDays + 1) * blockSize;
+	var isLandscapeTouch = usesLandscapeTouchGridLayout(viewportWidth);
+	var isCompact = usesCompactGridLayout(viewportWidth);
+	var hoursPerRow = isCompact ? MOBILE_HOURS_PER_ROW : DESKTOP_HOURS_PER_ROW;
+	var rowsPerDay = HOURS_PER_DAY / hoursPerRow;
+	var blockSize;
+	var layout = {
+		isCompact: isCompact,
+		isLandscapeTouch: isLandscapeTouch,
+		isFullWidth: isCompact || isLandscapeTouch,
+		hoursPerRow: hoursPerRow,
+		rowsPerDay: rowsPerDay,
+		dayLabelWidth: 0
+	};
+
+	if (isCompact || isLandscapeTouch) {
+		var labelMinWidth = isLandscapeTouch ? MOBILE_LANDSCAPE_LABEL_WIDTH : MOBILE_MIN_LABEL_WIDTH;
+		var fitted = fitFullWidthBlockSize(viewportWidth, labelMinWidth, hoursPerRow, MOBILE_GRID_RIGHT_MARGIN);
+		blockSize = fitted.blockSize;
+		layout.blockSize = blockSize;
+		layout.dayLabelWidth = fitted.dayLabelWidth;
+		layout.gridLeft = layout.dayLabelWidth;
+	} else {
+		blockSize = viewportWidth / BLOCK_SIZE_DIVIDER;
+		layout.blockSize = blockSize;
+	}
+
+	var gridBounds = getGridBounds(layout, viewportWidth);
+	layout.gridLeft = gridBounds.gridLeft;
+	layout.gridWidth = gridBounds.gridWidth;
+	applyLegendBand(layout, viewportWidth);
+
+	var totalRows = numDays * rowsPerDay;
+	var gridBottom = (totalRows + 1) * blockSize;
 	var legendBarHeight = Math.max(12, blockSize * 0.45);
 	var legendGap = blockSize * 0.35;
 	var legendBarY = gridBottom + legendGap;
 	var legendLabelY = legendBarY + legendBarHeight + 16;
-	var contentHeight = legendLabelY + 8;
-	return {
-		blockSize: blockSize,
-		gridLeft: gridBounds.gridLeft,
-		gridWidth: gridBounds.gridWidth,
-		gridBottom: gridBottom,
-		legendBarY: legendBarY,
-		legendBarHeight: legendBarHeight,
-		legendLabelY: legendLabelY,
-		contentHeight: contentHeight
-	};
+	layout.gridBottom = gridBottom;
+	layout.legendBarY = legendBarY;
+	layout.legendBarHeight = legendBarHeight;
+	layout.legendLabelY = legendLabelY;
+	layout.contentHeight = legendLabelY + 8;
+	return layout;
+}
+
+function applyGridLayoutCss(containerSelector, layout) {
+	var graph = document.querySelector(containerSelector);
+	if (!graph) {
+		return;
+	}
+	graph.style.setProperty('--grid-cell-size', layout.blockSize + 'px');
+	graph.classList.toggle('grid-layout--compact', layout.isCompact);
+	graph.classList.toggle('grid-layout--landscape-touch', layout.isLandscapeTouch);
+	document.body.classList.toggle('layout-compact', layout.isCompact);
+	document.body.classList.toggle('layout-landscape-touch', layout.isLandscapeTouch);
 }
 
 function easeInOutCubic(t) {
@@ -681,8 +1103,8 @@ function cellValueLabelAttrs(layout, viewportWidth, hourIndex, cellRect, cellVal
 function staticCellRect(hourIndex, layout, viewportWidth) {
 	var cellInner = layout.blockSize - 2;
 	return {
-		x: gridX(hourIndex, layout.blockSize, viewportWidth),
-		y: gridY(hourIndex, layout.blockSize),
+		x: gridX(hourIndex, layout, viewportWidth),
+		y: gridY(hourIndex, layout),
 		width: cellInner,
 		height: cellInner
 	};
@@ -788,10 +1210,10 @@ function styleCellValueLabel(selection, cellValues) {
 }
 
 function getCellIntroPosition(hourIndex, layout, viewportWidth, hProgress, vProgress) {
-	var originX = gridX(0, layout.blockSize, viewportWidth);
-	var originY = gridY(0, layout.blockSize);
-	var targetX = gridX(hourIndex, layout.blockSize, viewportWidth);
-	var targetY = gridY(hourIndex, layout.blockSize);
+	var originX = gridX(0, layout, viewportWidth);
+	var originY = gridY(0, layout);
+	var targetX = gridX(hourIndex, layout, viewportWidth);
+	var targetY = gridY(hourIndex, layout);
 	var size = cellSize(layout.blockSize);
 
 	if (vProgress <= 0) {
@@ -906,10 +1328,10 @@ function applyCellIndexLayout(animatedLayer, layout, viewportWidth) {
 	animatedLayer.selectAll("text.grid-cell-index")
 		.attr("font-size", labelFontSize + "px")
 		.attr("x", function (d) {
-			return gridX(d, layout.blockSize, viewportWidth) + cellInner / 2;
+			return gridX(d, layout, viewportWidth) + cellInner / 2;
 		})
 		.attr("y", function (d) {
-			return gridY(d, layout.blockSize) + cellInner / 2;
+			return gridY(d, layout) + cellInner / 2;
 		});
 }
 
@@ -1076,7 +1498,7 @@ function setGridCellIntroOpacity(animatedLayer, firstCellOpacity, otherCellsOpac
 }
 
 function setGridChromeOpacity(animatedLayer, opacity) {
-	animatedLayer.selectAll("text.day-row-label, rect.legend-swatch, text.legend-label, foreignObject.grid-icon, rect.grid-cell-current, text.grid-cell-value")
+	animatedLayer.selectAll("text.day-row-label, text.segment-row-label, rect.legend-swatch, text.legend-label, foreignObject.grid-icon, rect.grid-cell-current, text.grid-cell-value")
 		.attr("opacity", opacity);
 }
 
@@ -1203,8 +1625,8 @@ function runGridIntro(animatedLayer, layout, viewportWidth, applyLayout, cellVal
 		return;
 	}
 
-	var originX = gridX(0, layout.blockSize, viewportWidth);
-	var originY = gridY(0, layout.blockSize);
+	var originX = gridX(0, layout, viewportWidth);
+	var originY = gridY(0, layout);
 	var originSize = cellSize(layout.blockSize);
 
 	animatedLayer.selectAll("rect.grid-cell")
@@ -1255,19 +1677,19 @@ function clearGrid() {
 
 function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCodes, tooltip) {
 	var numDays = cellValues.length / HOURS_PER_DAY;
-	var margins = [10, 10, 10, 10];
 
-	var w = window;
 	var d = document;
-	var e = d.documentElement;
-	var g = d.getElementsByTagName('body')[0];
-	var viewportWidth = w.innerWidth || e.clientWidth || g.clientWidth;
+	var viewportWidth = getGridContainerWidth(containerSelector);
 
 	var layout = computeLayout(viewportWidth, numDays);
+	var margins = layout.isFullWidth ? [2, 0, 4, 0] : [10, 10, 10, 10];
+	var svgHeight = layout.contentHeight + margins[0] + margins[2];
+	applyGridLayoutCss(containerSelector, layout);
 	var svg = d3.select(containerSelector).append("svg:svg")
 		.attr("class", "weather-grid-svg")
+		.attr("viewBox", "0 0 " + viewportWidth + " " + svgHeight)
 		.attr("width", viewportWidth)
-		.attr("height", layout.contentHeight + margins[0] + margins[2]);
+		.attr("height", svgHeight);
 
 	var graph = svg.append("svg:g")
 		.attr("transform", "translate(" + margins[3] + "," + margins[0] + ")");
@@ -1286,8 +1708,8 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 	gridRects.enter().append("svg:rect")
 		.attr("class", "grid-cell")
 		.attr("data-hour-index", function (hourIndex) { return hourIndex; })
-		.attr("x", function (hourIndex) { return gridX(hourIndex, layout.blockSize, viewportWidth); })
-		.attr("y", function (hourIndex) { return gridY(hourIndex, layout.blockSize); })
+		.attr("x", function (hourIndex) { return gridX(hourIndex, layout, viewportWidth); })
+		.attr("y", function (hourIndex) { return gridY(hourIndex, layout); })
 		.attr("width", layout.blockSize - 2)
 		.attr("height", layout.blockSize - 2)
 		.attr("fill", function (hourIndex) { return cellFill(cellValues, hourIndex, scales); });
@@ -1349,8 +1771,8 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 		gridIcons.enter().append("foreignObject")
 			.attr("class", "grid-icon")
 			.attr("data-hour-index", function (d, i) { return i; })
-			.attr("x", function (d, i) { return gridX(i, layout.blockSize, viewportWidth); })
-			.attr("y", function (d, i) { return gridY(i, layout.blockSize); })
+			.attr("x", function (d, i) { return gridX(i, layout, viewportWidth); })
+			.attr("y", function (d, i) { return gridY(i, layout); })
 			.attr("width", cellSize(layout.blockSize))
 			.attr("height", cellSize(layout.blockSize))
 			.append("xhtml:div")
@@ -1382,85 +1804,54 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 			});
 	}
 
-	var dayLabels = buildDayLabels(hourTimes, numDays, layout.blockSize);
-	var labelX = rowLabelX(layout.gridLeft);
-	var labelFontSize = rowLabelFontSize(layout.blockSize);
-
-	var dayRowLabels = animatedLayer.selectAll('text.day-row-label')
-		.data(dayLabels);
-
-	dayRowLabels.enter().append('text')
-		.attr('class', 'day-row-label')
-		.attr('text-anchor', 'end')
-		.attr('fill', 'LightSteelBlue')
-		.attr('font-family', 'sans-serif')
-		.attr('font-size', labelFontSize + 'px')
-		.attr('x', labelX)
-		.attr('y', function (d) { return rowLabelY(d.dayIndex, layout.blockSize); })
-		.each(function (d) {
-			appendDayLabelTspans(d3.select(this), labelX, d);
-		});
-	dayRowLabels = animatedLayer.selectAll('text.day-row-label');
+	syncGridRowLabels(animatedLayer, hourTimes, numDays, layout, true);
 
 	var legendTemps = [];
 	for (var j = legend.min; j < legend.max; j++) {
 		legendTemps.push(j);
 	}
 
-	var legendSwatchWidth = layout.gridWidth / legend.swatchCount;
+	var legendSwatchWidth = layout.legendWidth / legend.swatchCount;
 
 	var legendSwatches = animatedLayer.selectAll("rect.legend-swatch")
 		.data(legendTemps);
 
 	legendSwatches.enter().append("svg:rect")
 		.attr("class", "legend-swatch")
-		.attr("x", function (d, i) { return layout.gridLeft + (i * legendSwatchWidth); })
+		.attr("x", function (d, i) { return layout.legendLeft + (i * legendSwatchWidth); })
 		.attr("y", layout.legendBarY)
-		.attr("width", legendSwatchWidth + 0.5)
+		.attr("width", function (d, i) { return legendSwatchDrawWidth(i, legendSwatchWidth, layout.legendLeft, layout.legendWidth); })
 		.attr("height", layout.legendBarHeight)
 		.attr("fill", function (d, i) { return cellFill(legendTemps, i, scales); });
 	legendSwatches = animatedLayer.selectAll("rect.legend-swatch");
 
-	var legendTicks = animatedLayer.selectAll("text.legend-label")
-		.data(legend.tickLabels);
-
-	legendTicks.enter().append("text")
-		.attr("class", "legend-label")
-		.text(function (d) { return d + ' ' + legend.unitSuffix; })
-		.attr("x", function (d) { return legendTickX(d, layout.gridLeft, layout.gridWidth, legend); })
-		.attr("y", layout.legendLabelY)
-		.attr("text-anchor", function (d, i) { return legendTickAnchor(i, legend.tickLabels.length); })
-		.attr("fill", "#e8eef4")
-		.attr("stroke", "#1a1a1a")
-		.attr("stroke-width", 3)
-		.attr("paint-order", "stroke")
-		.attr("font-family", "sans-serif")
-		.attr("font-size", "12px");
-	legendTicks = animatedLayer.selectAll("text.legend-label");
+	syncLegendChrome(animatedLayer, layout, legend, legendTemps, scales);
 	raiseGridIconsOnTop(animatedLayer);
 	raiseGridOverlayLabelsOnTop(animatedLayer);
 
 	function applyLayout(refreshDayText, skipCells) {
 		// D3 v2 enter() selections do not include appended nodes; always re-query live nodes.
+		svgHeight = layout.contentHeight + margins[0] + margins[2];
 		svg
+			.attr("viewBox", "0 0 " + viewportWidth + " " + svgHeight)
 			.attr("width", viewportWidth)
-			.attr("height", layout.contentHeight + margins[0] + margins[2]);
+			.attr("height", svgHeight);
 
 		if (skipCells) {
 			return;
 		}
 
 		animatedLayer.selectAll("rect.grid-cell")
-			.attr("x", function () { return gridX(getHourIndex(this), layout.blockSize, viewportWidth); })
-			.attr("y", function () { return gridY(getHourIndex(this), layout.blockSize); })
+			.attr("x", function () { return gridX(getHourIndex(this), layout, viewportWidth); })
+			.attr("y", function () { return gridY(getHourIndex(this), layout); })
 			.attr("width", layout.blockSize - 2)
 			.attr("height", layout.blockSize - 2)
 			.attr("opacity", 1)
 			.attr("visibility", "visible");
 
 		animatedLayer.selectAll("foreignObject.grid-icon")
-			.attr("x", function () { return gridX(getHourIndex(this), layout.blockSize, viewportWidth); })
-			.attr("y", function () { return gridY(getHourIndex(this), layout.blockSize); })
+			.attr("x", function () { return gridX(getHourIndex(this), layout, viewportWidth); })
+			.attr("y", function () { return gridY(getHourIndex(this), layout); })
 			.attr("width", cellSize(layout.blockSize))
 			.attr("height", cellSize(layout.blockSize));
 
@@ -1473,35 +1864,10 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 		raiseGridIconsOnTop(animatedLayer);
 		raiseGridOverlayLabelsOnTop(animatedLayer);
 
-		legendSwatchWidth = layout.gridWidth / legend.swatchCount;
+		applyLegendBand(layout, viewportWidth);
+		syncLegendChrome(animatedLayer, layout, legend, legendTemps, scales);
 
-		animatedLayer.selectAll("rect.legend-swatch")
-			.attr("x", function (d, i) { return layout.gridLeft + (i * legendSwatchWidth); })
-			.attr("y", layout.legendBarY)
-			.attr("width", legendSwatchWidth + 0.5)
-			.attr("height", layout.legendBarHeight)
-			.attr("fill", function (d, i) { return cellFill(legendTemps, i, scales); });
-
-		animatedLayer.selectAll("text.legend-label")
-			.attr("x", function (d) { return legendTickX(d, layout.gridLeft, layout.gridWidth, legend); })
-			.attr("y", layout.legendLabelY)
-			.attr("font-size", Math.max(10, Math.min(14, layout.blockSize * 0.32)) + "px");
-
-		labelX = rowLabelX(layout.gridLeft);
-		labelFontSize = rowLabelFontSize(layout.blockSize);
-
-		if (refreshDayText) {
-			dayLabels = buildDayLabels(hourTimes, numDays, layout.blockSize);
-			animatedLayer.selectAll('text.day-row-label').data(dayLabels);
-		}
-
-		animatedLayer.selectAll('text.day-row-label')
-			.attr('font-size', labelFontSize + 'px')
-			.attr('x', labelX)
-			.attr('y', function (d) { return rowLabelY(d.dayIndex, layout.blockSize); })
-			.each(function (d) {
-				syncDayLabelTspans(d3.select(this), labelX, d, refreshDayText);
-			});
+		syncGridRowLabels(animatedLayer, hourTimes, numDays, layout, refreshDayText);
 
 	}
 
@@ -1511,16 +1877,22 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 		}
 		gridRuntime.resizeFrame = window.requestAnimationFrame(function () {
 			gridRuntime.resizeFrame = 0;
-			var usedFullWeekdayBefore = layout.blockSize >= 22;
-			viewportWidth = w.innerWidth || e.clientWidth || g.clientWidth;
+			var wasCompact = layout.isCompact;
+			var wasLandscapeTouch = layout.isLandscapeTouch;
+			var usedFullWeekdayBefore = !layout.isCompact && layout.blockSize >= 22;
+			viewportWidth = getGridContainerWidth(containerSelector);
 			layout = computeLayout(viewportWidth, numDays);
+			applyGridLayoutCss(GRID_CONTAINER, layout);
 			if (gridRuntime.activeGrid) {
 				gridRuntime.activeGrid.layout = layout;
 				gridRuntime.activeGrid.viewportWidth = viewportWidth;
 			}
-			var usedFullWeekdayAfter = layout.blockSize >= 22;
+			var usedFullWeekdayAfter = !layout.isCompact && layout.blockSize >= 22;
+			var refreshRowLabels = wasCompact !== layout.isCompact
+				|| wasLandscapeTouch !== layout.isLandscapeTouch
+				|| usedFullWeekdayBefore !== usedFullWeekdayAfter;
 			if (!gridRuntime.introComplete) {
-				applyLayout(usedFullWeekdayBefore !== usedFullWeekdayAfter, true);
+				applyLayout(refreshRowLabels, true);
 				applyIntroFrame(
 					animatedLayer,
 					layout,
@@ -1531,7 +1903,7 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 				);
 				return;
 			}
-			applyLayout(usedFullWeekdayBefore !== usedFullWeekdayAfter);
+			applyLayout(refreshRowLabels);
 		});
 	}
 
@@ -1545,6 +1917,9 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 		applyLayout: applyLayout,
 		cellValues: cellValues
 	};
+	if (layout.isFullWidth) {
+		gridRuntime.skipNextIntro = true;
+	}
 	runGridIntro(animatedLayer, layout, viewportWidth, applyLayout, cellValues);
 }
 

@@ -10,7 +10,7 @@ rect.grid-cell-current {
 }
 
 foreignObject.grid-icon {
-	overflow: visible;
+	overflow: hidden;
 }
 
 .grid-icon-cell {
@@ -31,7 +31,9 @@ foreignObject.grid-icon {
 	justify-content: center;
 	width: 1em;
 	height: 1em;
-	font-size: x-large;
+	font-size: calc(var(--grid-cell-size, 16px) * 0.62);
+	max-width: 100%;
+	max-height: 100%;
 	line-height: 1;
 	color: black;
 }
@@ -56,8 +58,10 @@ foreignObject.grid-icon {
 
 .grid-icon-cell .grid-weather-svg {
 	display: block;
-	width: 70%;
-	height: 70%;
+	width: 62%;
+	height: 62%;
+	max-width: 100%;
+	max-height: 100%;
 	stroke: #000000;
 	stroke-width: 1.8;
 	stroke-linecap: round;
@@ -74,6 +78,30 @@ h1 {
 	color: LightSteelBlue;
 	font-family: arial;
 	text-align: center;
+}
+
+.orientation-hint {
+	display: none;
+	margin: 0 0 0.5rem;
+	padding: 0;
+	text-align: center;
+	font-family: arial, sans-serif;
+	font-size: 0.75rem;
+	color: #8899aa;
+}
+
+body.layout-compact .orientation-hint {
+	display: block;
+}
+
+body.layout-landscape-touch .orientation-hint {
+	display: none;
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+	.orientation-hint {
+		display: block;
+	}
 }
 
 h2 {
@@ -153,16 +181,23 @@ div.tooltip {
 }
 
 .grid-options-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 2.75rem;
 	height: 2.75rem;
 	padding: 0;
-	font-size: 1.35rem;
-	line-height: 1;
 	border: 1px solid #555;
 	border-radius: 6px;
 	background: #222;
 	color: lightsteelblue;
 	cursor: pointer;
+}
+
+.grid-options-gear-icon {
+	display: block;
+	width: 1.4rem;
+	height: 1.4rem;
 }
 
 .grid-options-toggle:hover,
@@ -262,6 +297,8 @@ text.grid-cell-value {
 
 .aGraph {
 	overflow: visible;
+	width: 100%;
+	box-sizing: border-box;
 }
 
 .weather-grid-svg {
@@ -316,16 +353,24 @@ text.grid-cell-value {
 }
 
 .location-geo-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
 	width: 2.75rem;
+	height: 2.75rem;
 	padding: 0;
-	font-size: 1.25rem;
-	line-height: 1;
 	border: 1px solid #555;
 	border-radius: 6px;
 	background: #222;
 	color: lightsteelblue;
 	cursor: pointer;
+}
+
+.location-marker-icon {
+	display: block;
+	width: 1.35rem;
+	height: 1.35rem;
 }
 
 .location-geo-btn:hover,
@@ -390,4 +435,206 @@ text.grid-cell-value {
 	font-size: 0.9rem;
 	margin: 0 0 0.5em;
 	min-height: 1.1em;
+}
+
+@media (max-width: 640px), ((hover: none) and (pointer: coarse) and (max-height: 640px)) {
+	.main-layout {
+		overflow-x: hidden;
+	}
+
+	h1 {
+		font-size: 1.15rem;
+		margin: 0.35rem 0 0.2rem;
+	}
+
+	h2 {
+		font-size: 1rem;
+		margin: 0.75rem 0 0.35rem;
+	}
+
+	p {
+		margin: 0 0 0.5rem;
+	}
+
+	.test-mode-banner {
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	.test-mode-note {
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	.location-search {
+		max-width: none;
+		margin-left: 0;
+		margin-right: 0;
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.location-suggestions {
+		left: 0;
+		right: 0;
+	}
+
+	.location-display,
+	.weather-status {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.location-display {
+		margin: 0.1em 0;
+		font-size: 0.85rem;
+		min-height: 1em;
+	}
+
+	.weather-status {
+		margin-bottom: 0.2em;
+		font-size: 0.8rem;
+		min-height: 1em;
+	}
+
+	.location-search {
+		margin-bottom: 0.2em;
+	}
+
+	.grid-toolbar {
+		margin-bottom: 0.2em;
+		gap: 0.35rem;
+	}
+
+	.orientation-hint {
+		margin-bottom: 0.25rem;
+		font-size: 0.7rem;
+	}
+
+	.aGraph {
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	text.segment-row-label {
+		pointer-events: none;
+	}
+
+	.weather-grid-svg {
+		margin-left: 0;
+		margin-right: 0;
+		max-width: 100%;
+	}
+}
+
+body.layout-compact h1,
+body.layout-compact h2,
+body.layout-landscape-touch h1,
+body.layout-landscape-touch h2 {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+body.layout-compact p,
+body.layout-compact .test-mode-banner,
+body.layout-compact .test-mode-note,
+body.layout-landscape-touch p,
+body.layout-landscape-touch .test-mode-banner,
+body.layout-landscape-touch .test-mode-note {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+body.layout-compact .location-search,
+body.layout-landscape-touch .location-search {
+	max-width: none;
+	margin-left: 0;
+	margin-right: 0;
+	padding-left: 0;
+	padding-right: 0;
+}
+
+body.layout-compact .location-suggestions,
+body.layout-landscape-touch .location-suggestions {
+	left: 0;
+	right: 0;
+}
+
+body.layout-compact .location-display,
+body.layout-compact .weather-status,
+body.layout-landscape-touch .location-display,
+body.layout-landscape-touch .weather-status {
+	padding-left: 0;
+	padding-right: 0;
+}
+
+body.layout-compact .aGraph,
+body.layout-compact .weather-grid-svg,
+body.layout-landscape-touch .aGraph,
+body.layout-landscape-touch .weather-grid-svg,
+.aGraph.grid-layout--landscape-touch {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+body.layout-compact h1,
+body.layout-landscape-touch h1 {
+	font-size: 1.15rem;
+	margin-top: 0.35rem;
+	margin-bottom: 0.2rem;
+}
+
+body.layout-compact .orientation-hint,
+body.layout-landscape-touch .orientation-hint {
+	margin-bottom: 0.25rem;
+	font-size: 0.7rem;
+}
+
+body.layout-compact .location-search,
+body.layout-landscape-touch .location-search {
+	margin-bottom: 0.2em;
+}
+
+body.layout-compact .location-display,
+body.layout-landscape-touch .location-display {
+	margin: 0.1em 0;
+	min-height: 1em;
+	font-size: 0.85rem;
+}
+
+body.layout-compact .weather-status,
+body.layout-landscape-touch .weather-status {
+	margin-bottom: 0.2em;
+	min-height: 1em;
+	font-size: 0.8rem;
+}
+
+body.layout-compact .grid-toolbar,
+body.layout-landscape-touch .grid-toolbar {
+	margin-bottom: 0.2em;
+	gap: 0.35rem;
+}
+
+body.layout-compact .replay-intro-btn,
+body.layout-landscape-touch .replay-intro-btn {
+	padding: 0.3em 0.6em;
+	font-size: 0.8rem;
+}
+
+body.layout-compact .grid-options-toggle,
+body.layout-landscape-touch .grid-options-toggle,
+body.layout-compact .location-geo-btn,
+body.layout-landscape-touch .location-geo-btn {
+	width: 2.4rem;
+	height: 2.4rem;
+}
+
+body.layout-compact .aGraph,
+body.layout-landscape-touch .aGraph {
+	overflow-x: hidden;
+}
+
+body.layout-landscape-touch .weather-grid-svg,
+body.layout-compact .weather-grid-svg {
+	max-width: 100%;
 }

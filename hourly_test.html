@@ -2,6 +2,8 @@
 <html>
 
 <head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>16 Day Hourly Temperature (test / fixture)</title>
 	<link rel="shortcut icon" href="favicon.ico" />
 	<link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico" />
@@ -17,6 +19,7 @@
 
 <body class="main-layout">
 	<h1>16 Day Hourly Temperature (test)</h1>
+	<p class="orientation-hint">Rotate phone for best insight into weather trends</p>
 
 	<p class="test-mode-banner">Test mode: forecast data is loaded from a local fixture. Open-Meteo is not called.</p>
 
@@ -41,7 +44,10 @@
 		<div class="grid-options" id="grid-options">
 			<button type="button" id="grid-options-toggle" class="grid-options-toggle" aria-expanded="false"
 				aria-controls="grid-options-panel" aria-label="Grid options" title="Grid options">
-				<span aria-hidden="true">&#9881;</span>
+				<svg class="grid-options-gear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path fill="currentColor"
+						d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.07 7.07 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.49-.42h-3.88a.5.5 0 0 0-.49.42l-.36 2.54a7.07 7.07 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96c.5.38 1.03.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.88a.5.5 0 0 0 .49-.42l.36-2.54a7.07 7.07 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z" />
+				</svg>
 			</button>
 			<div id="grid-options-panel" class="grid-options-panel" hidden>
 				<fieldset class="grid-options-fieldset">

@@ -17,6 +17,7 @@
 
 <body class="main-layout">
 	<h1> 16 Day Hourly Temperature</h1>
+	<p class="orientation-hint">Rotate phone for best insight into weather trends</p>
 
 	<div class="location-search" id="location-search">
 		<label class="location-search-label" for="location-input">Location</label>
@@ -25,7 +26,10 @@
 				autocomplete="off" spellcheck="false" />
 			<button type="button" id="location-use-geolocation" class="location-geo-btn"
 				title="Use my current location" aria-label="Use my current location">
-				<span aria-hidden="true">&#9678;</span>
+				<svg class="location-marker-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path fill="currentColor"
+						d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 14.5 9 2.5 2.5 0 0 1 12 11.5Z" />
+				</svg>
 			</button>
 		</div>
 		<ul id="location-suggestions" class="location-suggestions" hidden></ul>
