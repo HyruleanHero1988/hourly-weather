@@ -53,9 +53,48 @@
 		};
 	}
 
-	function saveLocation(location) {
+	function parseCoordinate(value) {
+		var parsed = typeof value === 'number' ? value : parseFloat(value);
+		return isFinite(parsed) ? parsed : null;
+	}
+
+	function normalizeLocation(location) {
+		if (!location || typeof location !== 'object') {
+			return null;
+		}
+		var lat = parseCoordinate(location.latitude);
+		var lon = parseCoordinate(location.longitude);
+		if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+			return null;
+		}
+		return {
+			latitude: lat,
+			longitude: lon,
+			label: location.label || (lat.toFixed(2) + ', ' + lon.toFixed(2))
+		};
+	}
+
+	function isDefaultLocation(location) {
+		return location
+			&& location.latitude === DEFAULT_LOCATION.latitude
+			&& location.longitude === DEFAULT_LOCATION.longitude;
+	}
+
+	function clearSavedLocation() {
 		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(location));
+			localStorage.removeItem(STORAGE_KEY);
+		} catch (err) {
+			// ignore storage failures
+		}
+	}
+
+	function saveLocation(location) {
+		var normalized = normalizeLocation(location);
+		if (!normalized) {
+			return;
+		}
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
 		} catch (err) {
 			// ignore quota / private mode errors
 		}
@@ -151,19 +190,40 @@
 
 	function applyLocation(location, options) {
 		options = options || {};
-		saveLocation(location);
-		if (options.updateUrl !== false) {
-			updateUrl(location);
+		var normalized = normalizeLocation(location);
+		if (!normalized) {
+			if (options.isRetry) {
+				setStatus('Could not load weather for this location.');
+				return Promise.resolve();
+			}
+			clearSavedLocation();
+			return applyLocation(DEFAULT_LOCATION, {
+				updateUrl: options.updateUrl,
+				isRetry: true
+			});
 		}
-		setLocationDisplay(location.label);
+
+		saveLocation(normalized);
+		if (options.updateUrl !== false) {
+			updateUrl(normalized);
+		}
+		setLocationDisplay(normalized.label);
 		setStatus('Loading forecast...');
-		return window.WeatherGrid.load(location)
+		return window.WeatherGrid.load(normalized)
 			.then(function () {
 				setStatus('');
 			})
 			.catch(function (err) {
-				setStatus('Could not load weather for this location.');
 				console.error(err);
+				if (!options.isRetry && !isDefaultLocation(normalized)) {
+					clearSavedLocation();
+					setStatus('Saved location failed. Loading default forecast...');
+					return applyLocation(DEFAULT_LOCATION, {
+						updateUrl: options.updateUrl,
+						isRetry: true
+					});
+				}
+				setStatus('Could not load weather for this location.');
 			});
 	}
 
@@ -196,14 +256,13 @@
 		var params = parseUrlParams();
 
 		if (params.lat && params.lon) {
-			var lat = parseFloat(params.lat);
-			var lon = parseFloat(params.lon);
-			if (!isNaN(lat) && !isNaN(lon)) {
-				return Promise.resolve({
-					latitude: lat,
-					longitude: lon,
-					label: params.location || params.q || (lat.toFixed(2) + ', ' + lon.toFixed(2))
-				});
+			var urlLocation = normalizeLocation({
+				latitude: params.lat,
+				longitude: params.lon,
+				label: params.location || params.q
+			});
+			if (urlLocation) {
+				return Promise.resolve(urlLocation);
 			}
 		}
 
@@ -229,9 +288,12 @@
 		}
 
 		return requestBrowserLocation()
+			.then(function (browserLocation) {
+				return normalizeLocation(browserLocation) || DEFAULT_LOCATION;
+			})
 			.catch(function () {
 				var saved = loadSavedLocation();
-				return saved || DEFAULT_LOCATION;
+				return normalizeLocation(saved) || DEFAULT_LOCATION;
 			});
 	}
 

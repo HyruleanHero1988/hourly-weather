@@ -122,14 +122,63 @@ const GRID_INTRO_CELL_FADE_MS = 300;
 const GRID_INTRO_CELL_PAUSE_MS = 300;
 const GRID_CHROME_FADE_MS = 500;
 
-function buildOpenMeteoUrl(latitude, longitude) {
-	var lat = latitude != null ? latitude : DEFAULT_LATITUDE;
-	var lon = longitude != null ? longitude : DEFAULT_LONGITUDE;
+function parseCoordinate(value, fallback) {
+	var parsed = typeof value === 'number' ? value : parseFloat(value);
+	if (!isFinite(parsed)) {
+		return fallback;
+	}
+	return parsed;
+}
+
+function normalizeLocationCoords(location) {
+	var fallbackLat = DEFAULT_LATITUDE;
+	var fallbackLon = DEFAULT_LONGITUDE;
+	if (!location || typeof location !== 'object') {
+		return {
+			latitude: fallbackLat,
+			longitude: fallbackLon,
+			label: 'Atlanta, Georgia, United States'
+		};
+	}
+	var lat = parseCoordinate(location.latitude, fallbackLat);
+	var lon = parseCoordinate(location.longitude, fallbackLon);
+	if (lat < -90 || lat > 90) {
+		lat = fallbackLat;
+	}
+	if (lon < -180 || lon > 180) {
+		lon = fallbackLon;
+	}
+	return {
+		latitude: lat,
+		longitude: lon,
+		label: location.label || (lat.toFixed(2) + ', ' + lon.toFixed(2))
+	};
+}
+
+function buildOpenMeteoUrl(latitude, longitude, useMinimalHourly) {
+	var lat = parseCoordinate(latitude, DEFAULT_LATITUDE);
+	var lon = parseCoordinate(longitude, DEFAULT_LONGITUDE);
 	var unit = gridRuntime.temperatureUnit === 'celsius' ? 'celsius' : 'fahrenheit';
+	var hourly = useMinimalHourly
+		? 'temperature_2m,weathercode'
+		: 'temperature_2m,weathercode,precipitation_probability,cloudcover';
 	return 'https://api.open-meteo.com/v1/forecast?latitude=' + lat
 		+ '&longitude=' + lon
-		+ '&hourly=temperature_2m,weathercode,precipitation_probability,cloudcover&temperature_unit=' + unit
+		+ '&hourly=' + hourly + '&temperature_unit=' + unit
 		+ '&forecast_days=' + FORECAST_DAYS + '&timezone=auto';
+}
+
+function validateForecastData(data) {
+	if (!data || data.error || !data.hourly) {
+		return 'Weather API returned an unexpected response.';
+	}
+	if (!data.hourly.time || !data.hourly.temperature_2m || !data.hourly.weathercode) {
+		return 'Weather API response is missing required hourly data.';
+	}
+	if (!data.hourly.time.length) {
+		return 'Weather API returned no forecast hours.';
+	}
+	return null;
 }
 
 function normalizeGridMode(mode) {
@@ -225,8 +274,9 @@ function estimateCloudCoverFromWeatherCode(weatherCode) {
 }
 
 function getCloudCoverValues(forecastData) {
-	if (forecastData.hourly.cloudcover) {
-		return forecastData.hourly.cloudcover.slice(0, HOURS_TO_SHOW);
+	var cloudcover = forecastData.hourly.cloudcover || forecastData.hourly.cloud_cover;
+	if (cloudcover) {
+		return cloudcover.slice(0, HOURS_TO_SHOW);
 	}
 	return forecastData.hourly.weathercode.slice(0, HOURS_TO_SHOW).map(estimateCloudCoverFromWeatherCode);
 }
@@ -1179,7 +1229,13 @@ function replayGridIntro() {
 	if (!active || !active.animatedLayer) {
 		return;
 	}
-	runGridIntro(active.animatedLayer, active.layout, active.viewportWidth, active.applyLayout);
+	runGridIntro(
+		active.animatedLayer,
+		active.layout,
+		active.viewportWidth,
+		active.applyLayout,
+		active.cellValues
+	);
 }
 
 function clearGrid() {
@@ -1492,9 +1548,24 @@ function renderWeatherGrid(containerSelector, cellValues, hourTimes, weatherCode
 	runGridIntro(animatedLayer, layout, viewportWidth, applyLayout, cellValues);
 }
 
+function isLocalDevEnvironment() {
+	var host = window.location.hostname;
+	return !host
+		|| host === 'localhost'
+		|| host === '127.0.0.1'
+		|| host === '[::1]';
+}
+
 function wireReplayIntroButton() {
 	var btn = document.getElementById('replay-grid-intro');
-	if (!btn || btn.getAttribute('data-wired') === 'true') {
+	if (!btn) {
+		return;
+	}
+	if (!isLocalDevEnvironment()) {
+		btn.hidden = true;
+		return;
+	}
+	if (btn.getAttribute('data-wired') === 'true') {
 		return;
 	}
 	btn.setAttribute('data-wired', 'true');
@@ -1613,6 +1684,7 @@ function wireGridOptions() {
 
 	gridRuntime.showTemperatureInCells = loadStoredShowTemperatureInCells();
 	gridRuntime.showWeatherIconsInPrecip = loadStoredShowWeatherIconsInPrecip();
+	gridRuntime.temperatureUnit = loadStoredTemperatureUnit();
 	gridRuntime.gridMode = loadStoredGridMode();
 	if (showTempsCheckbox) {
 		showTempsCheckbox.checked = gridRuntime.showTemperatureInCells;
@@ -1699,6 +1771,10 @@ function initWeatherGrid() {
 }
 
 function renderWeatherFromForecastData(data) {
+	var validationError = validateForecastData(data);
+	if (validationError) {
+		throw new Error(validationError);
+	}
 	gridRuntime.lastForecastData = data;
 	var times = data.hourly.time.slice(0, HOURS_TO_SHOW);
 	var cellValues = getCellValuesFromForecast(data);
@@ -1729,32 +1805,49 @@ function loadMockWeather() {
 	return loadWeatherFromForecastData(window.SAMPLE_FORECAST);
 }
 
+function fetchForecastForLocation(location, useMinimalHourly) {
+	var coords = normalizeLocationCoords(location);
+	return fetch(buildOpenMeteoUrl(coords.latitude, coords.longitude, useMinimalHourly))
+		.then(function (response) {
+			if (!response.ok) {
+				var error = new Error('Open-Meteo request failed: ' + response.status);
+				error.status = response.status;
+				throw error;
+			}
+			return response.json();
+		});
+}
+
 function loadWeatherForLocation(location) {
-	gridRuntime.lastLocation = location;
+	var coords = normalizeLocationCoords(location);
+	gridRuntime.lastLocation = coords;
 
 	if (gridRuntime.useMockData) {
 		return loadMockWeather();
 	}
 
-	var lat = location.latitude;
-	var lon = location.longitude;
 	var loadId = ++gridRuntime.loadGeneration;
 
 	clearGrid();
 
-	return fetch(buildOpenMeteoUrl(lat, lon))
-		.then(function (response) {
-			if (!response.ok) {
-				throw new Error('Open-Meteo request failed: ' + response.status);
-			}
-			return response.json();
-		})
-		.then(function (data) {
+	function finishLoad(data) {
+		if (loadId !== gridRuntime.loadGeneration) {
+			return;
+		}
+		gridRuntime.lastForecastDataUnit = gridRuntime.temperatureUnit;
+		renderWeatherFromForecastData(data);
+	}
+
+	return fetchForecastForLocation(coords, false)
+		.then(finishLoad)
+		.catch(function (err) {
 			if (loadId !== gridRuntime.loadGeneration) {
-				return;
+				throw err;
 			}
-			gridRuntime.lastForecastDataUnit = gridRuntime.temperatureUnit;
-			renderWeatherFromForecastData(data);
+			if (err && err.status === 400) {
+				return fetchForecastForLocation(coords, true).then(finishLoad);
+			}
+			throw err;
 		});
 }
 
