@@ -1,0 +1,18 @@
+name: Redeploy raygarrison.us
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  trigger-site-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger raygarrison.us site deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RAYGARRISON_SITE_DEPLOY_TOKEN }}
+          repository: HyruleanHero1988/raygarrison-us-site
+          event-type: hourly-weather-updated
+          client-payload: '{"source_repo":"hourly-weather","source_sha":"${{ github.sha }}"}'
